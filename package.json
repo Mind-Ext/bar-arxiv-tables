@@ -1,0 +1,28 @@
+{
+  "name": "bar-arxiv-tables",
+  "version": "0.1.0",
+  "description": "arXiv Table-to-Chart Userscript",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "GPL-3.0-or-later",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^11.5.2",
+      "onFail": "download"
+    }
+  },
+  "type": "module",
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.1.5",
+    "vite-plugin-monkey": "^8.1.0",
+    "vitest": "^4.1.10"
+  }
+}
