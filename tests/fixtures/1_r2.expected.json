@@ -3,8 +3,8 @@
   "orientation": "column",
   "totalRowCount": 7,
   "totalColCount": 10,
-  "headerRowCount": 2,
-  "headerColCount": 1,
+  "topNonNumRows": 2,
+  "leftNonNumCols": 2,
   "metrics": [
     { "colName": ["QQP", "363k"], "min": 64.8, "max": 72.1, "nullCount": 0, "highlightedCount": 1, "hasSd": false },
     { "colName": ["QNLI", "108k"], "min": 79.8, "max": 92.7, "nullCount": 0, "highlightedCount": 1, "hasSd": false },

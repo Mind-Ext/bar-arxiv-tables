@@ -3,12 +3,12 @@
   "orientation": "column",
   "totalRowCount": 15,
   "totalColCount": 5,
-  "headerRowCount": 2,
-  "headerColCount": 1,
+  "topNonNumRows": 3,
+  "leftNonNumCols": 1,
   "metrics": [
-    { "colName": ["Dev", "EM"], "min": 80.8, "max": 86.2, "nullCount": 7, "highlightedCount": 2, "hasSd": false },
-    { "colName": ["Dev", "F1"], "min": 85.6, "max": 92.2, "nullCount": 6, "highlightedCount": 2, "hasSd": false },
-    { "colName": ["Test", "EM"], "min": 82.3, "max": 87.4, "nullCount": 7, "highlightedCount": 2, "hasSd": false },
-    { "colName": ["Test", "F1"], "min": 85.8, "max": 93.2, "nullCount": 6, "highlightedCount": 2, "hasSd": false }
+    { "colName": ["Dev", "EM"], "min": 80.8, "max": 86.2, "nullCount": 4, "highlightedCount": 2, "hasSd": false },
+    { "colName": ["Dev", "F1"], "min": 85.6, "max": 92.2, "nullCount": 3, "highlightedCount": 2, "hasSd": false },
+    { "colName": ["Test", "EM"], "min": 82.3, "max": 87.4, "nullCount": 4, "highlightedCount": 2, "hasSd": false },
+    { "colName": ["Test", "F1"], "min": 85.8, "max": 93.2, "nullCount": 3, "highlightedCount": 2, "hasSd": false }
   ]
 }
