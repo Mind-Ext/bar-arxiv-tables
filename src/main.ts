@@ -18,9 +18,21 @@ initMenuCommands();
 // Core: discover tables and inject buttons
 // ---------------------------------------------------------------------------
 
+function updateButtonState(button: HTMLButtonElement, isActive: boolean): void {
+  if (isActive) {
+    button.classList.add('active');
+    button.classList.remove('inactive');
+    button.style.filter = 'none';
+  } else {
+    button.classList.remove('active');
+    button.classList.add('inactive');
+    button.style.filter = 'grayscale(100%)';
+  }
+}
+
 function handleVisualize(candidate: CandidateTable, button: HTMLButtonElement): void {
   const isActive = toggleInlineBars(candidate.parsed, candidate.table);
-  button.textContent = isActive ? '📊 Hide Bars' : '📊 Visualize';
+  updateButtonState(button, isActive);
 }
 
 function processPage(): void {
@@ -34,7 +46,7 @@ function processPage(): void {
     for (const candidate of candidates) {
       applyInlineBars(candidate.parsed, candidate.table);
       const btn = candidate.table.parentElement?.querySelector('.arxiv-chart-btn') as HTMLButtonElement | null;
-      if (btn) btn.textContent = '📊 Hide Bars';
+      if (btn) updateButtonState(btn, true);
     }
   }
 }

@@ -638,34 +638,60 @@ function hasQualifyingNumericColumn(parsed: ParsedTable): boolean {
 type VisualizeCallback = (candidate: CandidateTable, button: HTMLButtonElement) => void;
 
 /**
- * Inject "📊 Visualize" buttons above each candidate table.
+ * Inject rotated emoji buttons at the bottom-right of each candidate table.
  */
 export function injectButtons(
   candidates: CandidateTable[],
   onVisualize: VisualizeCallback,
 ): void {
   for (const candidate of candidates) {
+    const parent = candidate.table.parentElement;
+    if (!parent) continue;
+
     // Don't inject twice
-    if (candidate.table.parentElement?.querySelector('.arxiv-chart-btn')) continue;
+    if (parent.querySelector('.arxiv-chart-btn')) continue;
+
+    // Wrap table in relative wrapper if not already wrapped
+    let wrapper: HTMLElement = parent;
+    if (!parent.classList.contains('arxiv-chart-wrapper')) {
+      const div = document.createElement('div');
+      div.className = 'arxiv-chart-wrapper';
+      div.style.cssText = 'position: relative; display: inline-block; max-width: 100%;';
+      candidate.table.parentNode?.insertBefore(div, candidate.table);
+      div.appendChild(candidate.table);
+      wrapper = div;
+    } else {
+      if (getComputedStyle(wrapper).position === 'static') {
+        wrapper.style.position = 'relative';
+      }
+    }
 
     const btn = document.createElement('button');
-    btn.className = 'arxiv-chart-btn';
-    btn.textContent = '📊 Visualize';
+    btn.className = 'arxiv-chart-btn inactive';
+    btn.title = 'Toggle Chart Bars';
+    btn.innerHTML = '<span style="display: inline-block; transform: rotate(90deg);">📊</span>';
     btn.style.cssText = `
+      position: absolute;
+      bottom: 8px;
+      right: 8px;
+      z-index: 10;
       cursor: pointer;
-      padding: 4px 12px;
-      margin: 4px 0;
+      padding: 4px 6px;
       border: 1px solid #ccc;
       border-radius: 4px;
-      background: #f8f9fa;
-      font-size: 13px;
+      background: #ffffff;
+      font-size: 14px;
+      line-height: 1;
       display: inline-flex;
       align-items: center;
-      gap: 4px;
+      justify-content: center;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+      filter: grayscale(100%);
+      transition: filter 0.2s ease, transform 0.1s ease;
     `;
 
     btn.addEventListener('click', () => onVisualize(candidate, btn));
-    candidate.table.parentElement?.insertBefore(btn, candidate.table);
+    wrapper.appendChild(btn);
   }
 }
 

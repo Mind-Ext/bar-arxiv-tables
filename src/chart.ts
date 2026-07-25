@@ -27,16 +27,42 @@ interface ActiveVisualization {
 // Store active visualizations keyed by table element
 const activeVisualizations = new Map<HTMLTableElement, ActiveVisualization>();
 
-// ---------------------------------------------------------------------------
-// CSS custom properties for bar colors
-// ---------------------------------------------------------------------------
+interface BarColors {
+  pos: string;
+  posAccent: string;
+  neg: string;
+  negAccent: string;
+}
 
-const BAR_COLORS = {
-  pos: 'rgba(76, 175, 80, 0.30)',       // green tint for positive bars
-  posAccent: 'rgba(76, 175, 80, 0.55)', // vibrant green for highlighted SOTA
-  neg: 'rgba(244, 67, 54, 0.30)',       // red tint for negative bars
-  negAccent: 'rgba(244, 67, 54, 0.55)', // vibrant red for highlighted
-};
+/**
+ * Parse hex or rgb color string into { r, g, b } components.
+ */
+export function parseToRgb(colorStr: string): { r: number; g: number; b: number } {
+  const hex = colorStr.trim();
+  if (hex.startsWith('#')) {
+    let clean = hex.slice(1);
+    if (clean.length === 3) {
+      clean = clean.split('').map((ch) => ch + ch).join('');
+    }
+    if (clean.length === 6) {
+      const num = parseInt(clean, 16);
+      return {
+        r: (num >> 16) & 255,
+        g: (num >> 8) & 255,
+        b: num & 255,
+      };
+    }
+  }
+  const rgbMatch = colorStr.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+  if (rgbMatch) {
+    return {
+      r: parseInt(rgbMatch[1], 10),
+      g: parseInt(rgbMatch[2], 10),
+      b: parseInt(rgbMatch[3], 10),
+    };
+  }
+  return { r: 76, g: 175, b: 80 };
+}
 
 // ---------------------------------------------------------------------------
 // Core Rendering
@@ -63,32 +89,33 @@ function computeColumnStats(data: CellValue[][], numCols: number): ColumnStats[]
 }
 
 /**
- * Build the CSS linear-gradient for a cell based on column polarity.
+ * Build the CSS linear-gradient for a cell based on column polarity and palette color.
  */
 function buildGradient(
   value: number,
   stats: ColumnStats,
   isHighlighted: boolean,
+  colors: BarColors,
 ): string {
   const { min, max } = stats;
 
   // Constant column — full bar
   if (min === max) {
-    const color = isHighlighted ? BAR_COLORS.posAccent : BAR_COLORS.pos;
+    const color = isHighlighted ? colors.posAccent : colors.pos;
     return `linear-gradient(to right, ${color} 100%, transparent 100%)`;
   }
 
   // Positive column (min >= 0)
   if (min >= 0) {
     const ratio = ((value - min) / (max - min)) * 100;
-    const color = isHighlighted ? BAR_COLORS.posAccent : BAR_COLORS.pos;
+    const color = isHighlighted ? colors.posAccent : colors.pos;
     return `linear-gradient(to right, ${color} ${ratio}%, transparent ${ratio}%)`;
   }
 
   // Negative column (max <= 0)
   if (max <= 0) {
     const ratio = ((value - max) / (min - max)) * 100;
-    const color = isHighlighted ? BAR_COLORS.negAccent : BAR_COLORS.neg;
+    const color = isHighlighted ? colors.negAccent : colors.neg;
     return `linear-gradient(to left, ${color} ${ratio}%, transparent ${ratio}%)`;
   }
 
@@ -98,13 +125,16 @@ function buildGradient(
   const valPct = ((value - min) / range) * 100;
 
   if (value >= 0) {
-    const color = isHighlighted ? BAR_COLORS.posAccent : BAR_COLORS.pos;
+    const color = isHighlighted ? colors.posAccent : colors.pos;
     return `linear-gradient(to right, transparent ${zeroPct}%, ${color} ${zeroPct}%, ${color} ${valPct}%, transparent ${valPct}%)`;
   } else {
-    const color = isHighlighted ? BAR_COLORS.negAccent : BAR_COLORS.neg;
+    const color = isHighlighted ? colors.negAccent : colors.neg;
     return `linear-gradient(to right, transparent ${valPct}%, ${color} ${valPct}%, ${color} ${zeroPct}%, transparent ${zeroPct}%)`;
   }
 }
+
+/** Consistent bar overlay opacity (35%) optimized for text legibility in both light & dark modes */
+export const BAR_OPACITY = 0.35;
 
 /**
  * Apply inline cell-bar visualization to a parsed table.
@@ -118,6 +148,24 @@ export function applyInlineBars(
 
   const numCols = data[0].length;
   const stats = computeColumnStats(data, numCols);
+
+  const settings = getSettings();
+  const paletteColors = resolvePaletteColors(settings.colorPalette);
+
+  // Precompute per-column colors cycled from the active palette with consistent opacity
+  const columnBarColors: BarColors[] = [];
+  for (let c = 0; c < numCols; c++) {
+    const baseColor = paletteColors[c % paletteColors.length];
+    const { r, g, b } = parseToRgb(baseColor);
+    const colorStr = `rgba(${r}, ${g}, ${b}, ${BAR_OPACITY})`;
+    const negStr = `rgba(244, 67, 54, ${BAR_OPACITY})`;
+    columnBarColors.push({
+      pos: colorStr,
+      posAccent: colorStr,
+      neg: negStr,
+      negAccent: negStr,
+    });
+  }
 
   // Save original styles for toggle-off restoration
   const originalStyles = new Map<HTMLTableCellElement, string>();
@@ -135,8 +183,8 @@ export function applyInlineBars(
       // Save original
       originalStyles.set(cell, cell.style.background || '');
 
-      // Apply gradient
-      cell.style.background = buildGradient(cv.value, stats[c], cv.isHighlighted);
+      // Apply gradient using cycled palette colors for column c
+      cell.style.background = buildGradient(cv.value, stats[c], cv.isHighlighted, columnBarColors[c]);
     }
   }
 
