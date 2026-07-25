@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import monkey from 'vite-plugin-monkey';
 
 export default defineConfig({
@@ -6,19 +6,30 @@ export default defineConfig({
     monkey({
       entry: 'src/main.ts',
       userscript: {
-        name: 'arXiv Chart Visualizer',
+        name: 'Bar arXiv tables',
         namespace: 'npm/vite-plugin-monkey',
         version: '0.1.0',
+        description: 'Visualize numerical tables on arXiv HTML papers with bar charts and other styles.',
         match: [
           '*://arxiv.org/html/*',
-          'file:///*',
+          '*://ar5iv.labs.arxiv.org/html/*',
+          'file:///*.html',
         ],
         grant: [
           'GM_getValue',
           'GM_setValue',
           'GM_registerMenuCommand',
         ],
+        updateURL: 'https://github.com/Mind-Ext/bar-arxiv-tables/raw/main/dist/bar-arxiv-tables.user.js',
+        downloadURL: 'https://github.com/Mind-Ext/bar-arxiv-tables/raw/main/dist/bar-arxiv-tables.user.js',
+      },
+      build: {
+        fileName: 'bar-arxiv-tables.user.js',
       },
     }),
   ],
+  test: {
+    environment: 'jsdom',
+  },
 });
+
