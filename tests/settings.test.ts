@@ -35,20 +35,22 @@ describe('Settings Management', () => {
     expect(listener).toHaveBeenCalledWith({
       autoVisualize: true,
       colorPalette: 'Pastel1',
+      colorMap: 'Cividis',
+      renderMode: 'bars',
     });
 
     unsubscribe();
-    updateSettings({ colorPalette: 'Viridis' });
+    updateSettings({ colorPalette: 'Set1' });
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it('resolves preset and custom color palettes', () => {
-    expect(resolvePaletteColors('Pastel1')).toEqual(PRESET_PALETTES.Pastel1);
-    expect(resolvePaletteColors('Pastel2')).toEqual(PRESET_PALETTES.Pastel2);
-    expect(resolvePaletteColors('tab10')).toEqual(PRESET_PALETTES.tab10);
+    expect(resolvePaletteColors('Pastel1')).toEqual(Array.from(PRESET_PALETTES.Pastel1));
+    expect(resolvePaletteColors('Pastel2')).toEqual(Array.from(PRESET_PALETTES.Pastel2));
+    expect(resolvePaletteColors('tab10')).toEqual(Array.from(PRESET_PALETTES.tab10));
     expect(resolvePaletteColors('#ff0000, #00ff00')).toEqual(['#ff0000', '#00ff00']);
     expect(resolvePaletteColors('ff0000, 00ff00')).toEqual(['#ff0000', '#00ff00']);
-    expect(resolvePaletteColors('unknown-palette')).toEqual(PRESET_PALETTES.Pastel1);
+    expect(resolvePaletteColors('unknown-palette')).toEqual(Array.from(PRESET_PALETTES.Pastel1));
   });
 
 

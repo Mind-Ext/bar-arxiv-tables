@@ -635,10 +635,15 @@ function hasQualifyingNumericColumn(parsed: ParsedTable): boolean {
 // UI Injection & Observer
 // ---------------------------------------------------------------------------
 
-type VisualizeCallback = (candidate: CandidateTable, button: HTMLButtonElement) => void;
+export type VisualizeCallback = (
+  candidate: CandidateTable,
+  mode: 'bars' | 'heatmap',
+  btn: HTMLButtonElement,
+) => void;
 
 /**
- * Inject rotated emoji buttons at the bottom-right of each candidate table.
+ * Inject rotated emoji button (bars) and rainbow flag emoji button (heatmap)
+ * at the bottom-right of each candidate table.
  */
 export function injectButtons(
   candidates: CandidateTable[],
@@ -649,7 +654,7 @@ export function injectButtons(
     if (!parent) continue;
 
     // Don't inject twice
-    if (parent.querySelector('.arxiv-chart-btn')) continue;
+    if (parent.querySelector('.arxiv-chart-actions')) continue;
 
     // Wrap table in relative wrapper if not already wrapped
     let wrapper: HTMLElement = parent;
@@ -666,15 +671,18 @@ export function injectButtons(
       }
     }
 
-    const btn = document.createElement('button');
-    btn.className = 'arxiv-chart-btn inactive';
-    btn.title = 'Toggle Chart Bars';
-    btn.innerHTML = '<span style="display: inline-block; transform: rotate(90deg);">📊</span>';
-    btn.style.cssText = `
+    const actionsContainer = document.createElement('div');
+    actionsContainer.className = 'arxiv-chart-actions';
+    actionsContainer.style.cssText = `
       position: absolute;
       bottom: 8px;
       right: 8px;
       z-index: 10;
+      display: inline-flex;
+      gap: 4px;
+    `;
+
+    const commonBtnStyle = `
       cursor: pointer;
       padding: 4px 6px;
       border: 1px solid #ccc;
@@ -690,8 +698,25 @@ export function injectButtons(
       transition: filter 0.2s ease, transform 0.1s ease;
     `;
 
-    btn.addEventListener('click', () => onVisualize(candidate, btn));
-    wrapper.appendChild(btn);
+    // 1. Bars button (📊 rotated 90deg)
+    const barsBtn = document.createElement('button');
+    barsBtn.className = 'arxiv-chart-btn bars-btn inactive';
+    barsBtn.title = 'Toggle Bar Chart Overlay';
+    barsBtn.innerHTML = '<span style="display: inline-block; transform: rotate(90deg);">📊</span>';
+    barsBtn.style.cssText = commonBtnStyle;
+    barsBtn.addEventListener('click', () => onVisualize(candidate, 'bars', barsBtn));
+
+    // 2. Heatmap button (🏳️‍🌈 rainbow flag)
+    const heatmapBtn = document.createElement('button');
+    heatmapBtn.className = 'arxiv-chart-btn heatmap-btn inactive';
+    heatmapBtn.title = 'Toggle Heatmap Overlay';
+    heatmapBtn.innerHTML = '<span style="display: inline-block;">🏳️‍🌈</span>';
+    heatmapBtn.style.cssText = commonBtnStyle;
+    heatmapBtn.addEventListener('click', () => onVisualize(candidate, 'heatmap', heatmapBtn));
+
+    actionsContainer.appendChild(barsBtn);
+    actionsContainer.appendChild(heatmapBtn);
+    wrapper.appendChild(actionsContainer);
   }
 }
 

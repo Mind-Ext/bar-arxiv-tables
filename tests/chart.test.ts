@@ -71,10 +71,51 @@ describe('Chart & Visualization Styling', () => {
       // Col 1 should use rgb(255, 127, 14) from tab10[1] with consistent opacity 0.35
       expect(td01.style.background).toContain('rgba(255, 127, 14, 0.35)');
     });
+
+    it('applies heatmap background colors continuously when renderMode is heatmap', () => {
+      updateSettings({ colorMap: 'Viridis', renderMode: 'heatmap' });
+
+      const dom = new JSDOM(`
+        <figure>
+          <table>
+            <tr><td>0</td></tr>
+            <tr><td>100</td></tr>
+          </table>
+        </figure>
+      `);
+
+      const table = dom.window.document.querySelector('table') as HTMLTableElement;
+      const td0 = table.rows[0].cells[0];
+      const td1 = table.rows[1].cells[0];
+
+      const parsed: ParsedTable = {
+        caption: 'Test Heatmap',
+        colNames: [['Val']],
+        rowNames: [['R1'], ['R2']],
+        topNonNumRows: 0,
+        leftNonNumCols: 0,
+        data: [
+          [{ value: 0, isHighlighted: false, raw: '0' }],
+          [{ value: 100, isHighlighted: false, raw: '100' }],
+        ],
+        domCells: [[td0], [td1]],
+        orientation: 'column',
+      };
+
+      applyInlineBars(parsed, table);
+
+      // Heatmap mode should apply full cell gradient with opacity 0.35
+      expect(td0.style.background).toContain('linear-gradient(to right,');
+      expect(td0.style.background).toContain('0.35');
+      expect(td1.style.background).toContain('linear-gradient(to right,');
+      expect(td1.style.background).toContain('0.35');
+      // Values at 0 and 100 should produce different heatmap colors along Viridis scale
+      expect(td0.style.background).not.toEqual(td1.style.background);
+    });
   });
 
   describe('Button Injection & Styling', () => {
-    it('injects button with bottom-right positioning, rotated emoji, and grayscale filter', () => {
+    it('injects bars and heatmap buttons with bottom-right positioning, rotated emoji, rainbow flag, and grayscale filter', () => {
       const dom = new JSDOM(`
         <figure>
           <table>
@@ -109,15 +150,59 @@ describe('Chart & Visualization Styling', () => {
       const wrapper = table.parentElement as HTMLElement;
       expect(wrapper.classList.contains('arxiv-chart-wrapper')).toBe(true);
 
-      const btn = wrapper.querySelector('.arxiv-chart-btn') as HTMLButtonElement;
-      expect(btn).not.toBeNull();
-      expect(btn.classList.contains('inactive')).toBe(true);
-      expect(btn.style.position).toBe('absolute');
-      expect(btn.style.bottom).toBe('8px');
-      expect(btn.style.right).toBe('8px');
-      expect(btn.style.filter).toBe('grayscale(100%)');
-      expect(btn.innerHTML).toContain('rotate(90deg)');
-      expect(btn.innerHTML).toContain('📊');
+      const actionsContainer = wrapper.querySelector('.arxiv-chart-actions') as HTMLElement;
+      expect(actionsContainer).not.toBeNull();
+      expect(actionsContainer.style.position).toBe('absolute');
+      expect(actionsContainer.style.bottom).toBe('8px');
+      expect(actionsContainer.style.right).toBe('8px');
+
+      const barsBtn = actionsContainer.querySelector('.bars-btn') as HTMLButtonElement;
+      expect(barsBtn).not.toBeNull();
+      expect(barsBtn.classList.contains('inactive')).toBe(true);
+      expect(barsBtn.style.filter).toBe('grayscale(100%)');
+      expect(barsBtn.innerHTML).toContain('rotate(90deg)');
+      expect(barsBtn.innerHTML).toContain('📊');
+
+      const heatmapBtn = actionsContainer.querySelector('.heatmap-btn') as HTMLButtonElement;
+      expect(heatmapBtn).not.toBeNull();
+      expect(heatmapBtn.classList.contains('inactive')).toBe(true);
+      expect(heatmapBtn.style.filter).toBe('grayscale(100%)');
+      expect(heatmapBtn.innerHTML).toContain('🏳️‍🌈');
+    });
+
+    it('toggles bars and heatmap modes mutually exclusively', () => {
+      const dom = new JSDOM(`
+        <figure>
+          <table>
+            <tr><td>10</td></tr>
+            <tr><td>20</td></tr>
+          </table>
+        </figure>
+      `);
+
+      const table = dom.window.document.querySelector('table') as HTMLTableElement;
+      const parsed: ParsedTable = {
+        caption: 'Sample Table',
+        colNames: [['Val']],
+        rowNames: [['R1'], ['R2']],
+        topNonNumRows: 0,
+        leftNonNumCols: 0,
+        data: [[{ value: 10, isHighlighted: false, raw: '10' }], [{ value: 20, isHighlighted: false, raw: '20' }]],
+        domCells: [[table.rows[0].cells[0]], [table.rows[1].cells[0]]],
+        orientation: 'column',
+      };
+
+      // Turn on bars mode
+      let mode = toggleInlineBars(parsed, table, 'bars');
+      expect(mode).toBe('bars');
+
+      // Switch to heatmap mode
+      mode = toggleInlineBars(parsed, table, 'heatmap');
+      expect(mode).toBe('heatmap');
+
+      // Toggle off heatmap mode
+      mode = toggleInlineBars(parsed, table, 'heatmap');
+      expect(mode).toBeNull();
     });
   });
 });

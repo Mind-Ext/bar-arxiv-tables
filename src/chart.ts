@@ -1,13 +1,9 @@
-/**
- * Visualization — Phase 5: Inline Cell Bars
- *
- * Overlays horizontal bar backgrounds on numeric <td> cells, turning each
- * column into an in-place bar chart. Uses ParsedTable.domCells for direct
- * DOM manipulation.
- */
-
 import { ParsedTable, CellValue } from './parser';
-import { resolvePaletteColors, getSettings } from './settings';
+import {
+  resolvePaletteCycle,
+  resolveColormapCycle,
+  getSettings,
+} from './settings';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -22,6 +18,7 @@ interface ActiveVisualization {
   parsed: ParsedTable;
   originalStyles: Map<HTMLTableCellElement, string>;
   active: boolean;
+  mode: 'bars' | 'heatmap';
 }
 
 // Store active visualizations keyed by table element
@@ -33,6 +30,9 @@ interface BarColors {
   neg: string;
   negAccent: string;
 }
+
+/** Consistent bar overlay opacity (35%) optimized for text legibility in both light & dark modes */
+export const BAR_OPACITY = 0.35;
 
 /**
  * Parse hex or rgb color string into { r, g, b } components.
@@ -133,15 +133,13 @@ function buildGradient(
   }
 }
 
-/** Consistent bar overlay opacity (35%) optimized for text legibility in both light & dark modes */
-export const BAR_OPACITY = 0.35;
-
 /**
- * Apply inline cell-bar visualization to a parsed table.
+ * Apply inline cell-bar or heatmap visualization to a parsed table.
  */
 export function applyInlineBars(
   parsed: ParsedTable,
   table: HTMLTableElement,
+  overrideMode?: 'bars' | 'heatmap',
 ): void {
   const { data, domCells } = parsed;
   if (data.length === 0) return;
@@ -150,12 +148,15 @@ export function applyInlineBars(
   const stats = computeColumnStats(data, numCols);
 
   const settings = getSettings();
-  const paletteColors = resolvePaletteColors(settings.colorPalette);
+  const activeMode = overrideMode || settings.renderMode;
+  const paletteCycle = resolvePaletteCycle(settings.colorPalette);
+  const colormapCycle = resolveColormapCycle(settings.colorMap);
 
-  // Precompute per-column colors cycled from the active palette with consistent opacity
+  // Precompute per-column colors cycled from the active palette cycle for bars mode
   const columnBarColors: BarColors[] = [];
   for (let c = 0; c < numCols; c++) {
-    const baseColor = paletteColors[c % paletteColors.length];
+    const palette = paletteCycle[c % paletteCycle.length];
+    const baseColor = palette[c % palette.length];
     const { r, g, b } = parseToRgb(baseColor);
     const colorStr = `rgba(${r}, ${g}, ${b}, ${BAR_OPACITY})`;
     const negStr = `rgba(244, 67, 54, ${BAR_OPACITY})`;
@@ -183,8 +184,18 @@ export function applyInlineBars(
       // Save original
       originalStyles.set(cell, cell.style.background || '');
 
-      // Apply gradient using cycled palette colors for column c
-      cell.style.background = buildGradient(cv.value, stats[c], cv.isHighlighted, columnBarColors[c]);
+      if (activeMode === 'heatmap') {
+        const { min, max } = stats[c];
+        const norm = min === max ? 0.5 : Math.max(0, Math.min(1, (cv.value - min) / (max - min)));
+        const interpolator = colormapCycle[c % colormapCycle.length];
+        const rgbStr = interpolator(norm);
+        const { r, g, b } = parseToRgb(rgbStr);
+        const heatColor = `rgba(${r}, ${g}, ${b}, ${BAR_OPACITY})`;
+        cell.style.background = `linear-gradient(to right, ${heatColor} 100%, transparent 100%)`;
+      } else {
+        // Bar mode
+        cell.style.background = buildGradient(cv.value, stats[c], cv.isHighlighted, columnBarColors[c]);
+      }
     }
   }
 
@@ -192,11 +203,12 @@ export function applyInlineBars(
     parsed,
     originalStyles,
     active: true,
+    mode: activeMode,
   });
 }
 
 /**
- * Remove inline cell-bar visualization from a table.
+ * Remove inline cell-bar or heatmap visualization from a table.
  */
 export function removeInlineBars(table: HTMLTableElement): void {
   const viz = activeVisualizations.get(table);
@@ -210,31 +222,47 @@ export function removeInlineBars(table: HTMLTableElement): void {
 }
 
 /**
- * Toggle inline bars on/off for a table.
- * Returns true if bars are now visible.
+ * Toggle inline visualization mode on/off for a table.
+ * Returns the currently active mode ('bars' | 'heatmap') or null if toggled off.
  */
 export function toggleInlineBars(
   parsed: ParsedTable,
   table: HTMLTableElement,
-): boolean {
+  targetMode: 'bars' | 'heatmap' = 'bars',
+): 'bars' | 'heatmap' | null {
   const viz = activeVisualizations.get(table);
   if (viz && viz.active) {
-    removeInlineBars(table);
-    return false;
+    if (viz.mode === targetMode) {
+      removeInlineBars(table);
+      return null;
+    } else {
+      removeInlineBars(table);
+      applyInlineBars(parsed, table, targetMode);
+      return targetMode;
+    }
   } else {
-    applyInlineBars(parsed, table);
-    return true;
+    applyInlineBars(parsed, table, targetMode);
+    return targetMode;
   }
 }
 
 /**
- * Re-render all active visualizations (e.g., after palette change).
+ * Get active visualization mode for a table if active.
+ */
+export function getActiveVisualizationMode(table: HTMLTableElement): 'bars' | 'heatmap' | null {
+  const viz = activeVisualizations.get(table);
+  return viz && viz.active ? viz.mode : null;
+}
+
+/**
+ * Re-render all active visualizations (e.g., after palette or mode change).
  */
 export function updateAllVisualizations(): void {
   for (const [table, viz] of activeVisualizations) {
     if (viz.active) {
+      const mode = viz.mode;
       removeInlineBars(table);
-      applyInlineBars(viz.parsed, table);
+      applyInlineBars(viz.parsed, table, mode);
     }
   }
 }

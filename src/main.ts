@@ -18,21 +18,47 @@ initMenuCommands();
 // Core: discover tables and inject buttons
 // ---------------------------------------------------------------------------
 
-function updateButtonState(button: HTMLButtonElement, isActive: boolean): void {
-  if (isActive) {
-    button.classList.add('active');
-    button.classList.remove('inactive');
-    button.style.filter = 'none';
-  } else {
-    button.classList.remove('active');
-    button.classList.add('inactive');
-    button.style.filter = 'grayscale(100%)';
+function updateButtonGroupState(
+  container: HTMLElement | null,
+  activeMode: 'bars' | 'heatmap' | null,
+): void {
+  if (!container) return;
+  const barsBtn = container.querySelector('.bars-btn') as HTMLButtonElement | null;
+  const heatmapBtn = container.querySelector('.heatmap-btn') as HTMLButtonElement | null;
+
+  if (barsBtn) {
+    if (activeMode === 'bars') {
+      barsBtn.classList.add('active');
+      barsBtn.classList.remove('inactive');
+      barsBtn.style.filter = 'none';
+    } else {
+      barsBtn.classList.remove('active');
+      barsBtn.classList.add('inactive');
+      barsBtn.style.filter = 'grayscale(100%)';
+    }
+  }
+
+  if (heatmapBtn) {
+    if (activeMode === 'heatmap') {
+      heatmapBtn.classList.add('active');
+      heatmapBtn.classList.remove('inactive');
+      heatmapBtn.style.filter = 'none';
+    } else {
+      heatmapBtn.classList.remove('active');
+      heatmapBtn.classList.add('inactive');
+      heatmapBtn.style.filter = 'grayscale(100%)';
+    }
   }
 }
 
-function handleVisualize(candidate: CandidateTable, button: HTMLButtonElement): void {
-  const isActive = toggleInlineBars(candidate.parsed, candidate.table);
-  updateButtonState(button, isActive);
+function handleVisualize(
+  candidate: CandidateTable,
+  mode: 'bars' | 'heatmap',
+  btn: HTMLButtonElement,
+): void {
+  const activeMode = toggleInlineBars(candidate.parsed, candidate.table, mode);
+  const container = btn.closest('.arxiv-chart-actions') as HTMLElement | null;
+  updateButtonGroupState(container, activeMode);
 }
 
 function processPage(): void {
@@ -43,10 +69,11 @@ function processPage(): void {
 
   // Auto-visualize if enabled
   if (getSettings().autoVisualize) {
+    const defaultMode = getSettings().renderMode;
     for (const candidate of candidates) {
-      applyInlineBars(candidate.parsed, candidate.table);
-      const btn = candidate.table.parentElement?.querySelector('.arxiv-chart-btn') as HTMLButtonElement | null;
-      if (btn) updateButtonState(btn, true);
+      applyInlineBars(candidate.parsed, candidate.table, defaultMode);
+      const container = candidate.table.parentElement?.querySelector('.arxiv-chart-actions') as HTMLElement | null;
+      updateButtonGroupState(container, defaultMode);
     }
   }
 }

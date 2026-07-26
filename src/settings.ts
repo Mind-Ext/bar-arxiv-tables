@@ -4,26 +4,103 @@
  * Notifies subscribers immediately on change without page reloads.
  */
 
+import {
+  schemePastel1,
+  schemePastel2,
+  schemeSet1,
+  schemeSet2,
+  schemeSet3,
+  schemeCategory10,
+  schemeTableau10,
+  schemeObservable10,
+  schemePaired,
+  schemeDark2,
+  schemeAccent,
+  interpolateViridis,
+  interpolatePlasma,
+  interpolateInferno,
+  interpolateMagma,
+  interpolateCividis,
+  interpolateTurbo,
+  interpolateWarm,
+  interpolateCool,
+  interpolateBlues,
+  interpolateGreens,
+  interpolateGreys,
+  interpolateOranges,
+  interpolatePurples,
+  interpolateReds,
+  interpolateSpectral,
+  interpolateRdYlBu,
+  interpolateRdYlGn,
+  interpolateRdBu,
+  interpolateRdGy,
+  interpolatePiYG,
+  interpolatePRGn,
+  interpolatePuOr,
+  interpolateBrBG,
+} from 'd3-scale-chromatic';
+
 export interface Settings {
   autoVisualize: boolean;
   colorPalette: string;
+  colorMap: string;
+  renderMode: 'bars' | 'heatmap';
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   autoVisualize: false,
   colorPalette: 'Pastel1',
+  colorMap: 'Cividis',
+  renderMode: 'bars',
 };
 
-export const PRESET_PALETTES: Record<string, string[]> = {
-  Pastel1: ['#fbb4ae', '#b3cde3', '#ccebc5', '#decbe4', '#fed9a6', '#ffffcc', '#e5d8bd', '#fddaec', '#f2f2f2'],
-  Pastel2: ['#b3e2cd', '#fdcdac', '#cbd5e8', '#f4cae4', '#e6f5c9', '#fff2ae', '#f1e2cc', '#cccccc'],
-  Set1: ['#e41a1c', '#377eb8', '#4daf4a', '#984ea3', '#ff7f00', '#ffff33', '#a65628', '#f781bf', '#999999'],
-  Set2: ['#66c2a5', '#fc8d62', '#8da0cb', '#e78ac3', '#a6d854', '#ffd92f', '#e5c494', '#b3b3b3'],
-  Set3: ['#8dd3c7', '#ffffb3', '#bebada', '#fb8072', '#80b1d3', '#fdb462', '#b3de69', '#fccde5', '#d9d9d9', '#bc80bd', '#ccebc5', '#ffed6f'],
-  tab10: ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'],
+/** Continuous D3 color scale interpolators (Sequential & Diverging) */
+export const PRESET_COLORMAPS: Record<string, (t: number) => string> = {
+  // Perceptual
+  Viridis: interpolateViridis,
+  Plasma: interpolatePlasma,
+  Inferno: interpolateInferno,
+  Magma: interpolateMagma,
+  Cividis: interpolateCividis,
+  Turbo: interpolateTurbo,
+  Warm: interpolateWarm,
+  Cool: interpolateCool,
+
+  // Single-hue Sequential
+  Blues: interpolateBlues,
+  Greens: interpolateGreens,
+  Greys: interpolateGreys,
+  Oranges: interpolateOranges,
+  Purples: interpolatePurples,
+  Reds: interpolateReds,
+
+  // Diverging
+  Spectral: interpolateSpectral,
+  RdYlBu: interpolateRdYlBu,
+  RdYlGn: interpolateRdYlGn,
+  RdBu: interpolateRdBu,
+  RdGy: interpolateRdGy,
+  PiYG: interpolatePiYG,
+  PRGn: interpolatePRGn,
+  PuOr: interpolatePuOr,
+  BrBG: interpolateBrBG,
 };
 
-
+/** Categorical D3 color schemes */
+export const PRESET_PALETTES: Record<string, readonly string[]> = {
+  Pastel1: schemePastel1,
+  Pastel2: schemePastel2,
+  Set1: schemeSet1,
+  Set2: schemeSet2,
+  Set3: schemeSet3,
+  tab10: schemeCategory10,
+  Tableau10: schemeTableau10,
+  Observable10: schemeObservable10,
+  Paired: schemePaired,
+  Dark2: schemeDark2,
+  Accent: schemeAccent,
+};
 type SettingsChangeListener = (settings: Settings) => void;
 const listeners: SettingsChangeListener[] = [];
 
@@ -75,7 +152,6 @@ export function _resetStorageForTesting(): void {
   memoryStore.clear();
 }
 
-
 /**
  * Retrieve current user settings.
  */
@@ -83,6 +159,8 @@ export function getSettings(): Settings {
   return {
     autoVisualize: getValue('autoVisualize', DEFAULT_SETTINGS.autoVisualize),
     colorPalette: getValue('colorPalette', DEFAULT_SETTINGS.colorPalette),
+    colorMap: getValue('colorMap', DEFAULT_SETTINGS.colorMap),
+    renderMode: getValue('renderMode', DEFAULT_SETTINGS.renderMode),
   };
 }
 
@@ -98,6 +176,12 @@ export function updateSettings(partial: Partial<Settings>): Settings {
   }
   if (partial.colorPalette !== undefined) {
     setValue('colorPalette', updated.colorPalette);
+  }
+  if (partial.colorMap !== undefined) {
+    setValue('colorMap', updated.colorMap);
+  }
+  if (partial.renderMode !== undefined) {
+    setValue('renderMode', updated.renderMode);
   }
 
   notifyListeners(updated);
@@ -132,17 +216,39 @@ function notifyListeners(settings: Settings): void {
  */
 export function resolvePaletteColors(paletteSetting: string): string[] {
   if (PRESET_PALETTES[paletteSetting]) {
-    return PRESET_PALETTES[paletteSetting];
+    return Array.from(PRESET_PALETTES[paletteSetting]);
   }
   const customColors = paletteSetting
     .split(',')
     .map((c) => c.trim())
     .filter((c) => /^#?([0-9a-fA-F]{3,8})$|^rgba?\(|^hsla?\(/i.test(c))
     .map((c) => (/^[0-9a-fA-F]{3,8}$/i.test(c) ? `#${c}` : c));
-  return customColors.length > 0 ? customColors : PRESET_PALETTES.Pastel1;
+  return customColors.length > 0 ? customColors : Array.from(PRESET_PALETTES.Pastel1);
 }
 
+/**
+ * Resolve comma-separated palettes for cycling across columns in bars mode.
+ */
+export function resolvePaletteCycle(setting: string): string[][] {
+  const parts = setting.split(',').map((s) => s.trim()).filter(Boolean);
+  if (parts.length === 0) return [resolvePaletteColors('Pastel1')];
 
+  const isAllHex = parts.every((p) => /^#?([0-9a-fA-F]{3,8})$|^rgba?\(|^hsla?\(/i.test(p));
+  if (isAllHex) {
+    return [parts.map((c) => (/^[0-9a-fA-F]{3,8}$/i.test(c) ? `#${c}` : c))];
+  }
+
+  return parts.map((p) => resolvePaletteColors(p));
+}
+
+/**
+ * Resolve comma-separated colormap functions for cycling across columns in heatmap mode.
+ */
+export function resolveColormapCycle(setting: string): ((t: number) => string)[] {
+  const parts = setting.split(',').map((s) => s.trim()).filter(Boolean);
+  if (parts.length === 0) return [interpolateViridis];
+  return parts.map((name) => PRESET_COLORMAPS[name] || interpolateViridis);
+}
 
 /**
  * Register Tampermonkey / Violentmonkey menu commands if available.
@@ -155,7 +261,9 @@ export function initMenuCommands(): void {
 
   const settings = getSettings();
   const autoVisLabel = `Toggle Auto-Visualize (${settings.autoVisualize ? 'ON' : 'OFF'})`;
-  const paletteLabel = `Color Palette (Current: ${settings.colorPalette})`;
+  const paletteLabel = `Bar Color Palette (Current: ${settings.colorPalette})`;
+  const mapLabel = `Heatmap Color Map (Current: ${settings.colorMap})`;
+  const modeLabel = `Render Mode (Current: ${settings.renderMode})`;
 
   GM_registerMenuCommand(autoVisLabel, () => {
     const current = getSettings();
@@ -171,5 +279,21 @@ export function initMenuCommands(): void {
     const nextPalette = presets[(currentIndex + 1) % presets.length];
     updateSettings({ colorPalette: nextPalette });
     console.log(`[arXiv-Charts] Color palette changed to ${nextPalette}`);
+  });
+
+  GM_registerMenuCommand(mapLabel, () => {
+    const current = getSettings();
+    const maps = Object.keys(PRESET_COLORMAPS);
+    const currentIndex = maps.indexOf(current.colorMap);
+    const nextMap = maps[(currentIndex + 1) % maps.length];
+    updateSettings({ colorMap: nextMap });
+    console.log(`[arXiv-Charts] Color map changed to ${nextMap}`);
+  });
+
+  GM_registerMenuCommand(modeLabel, () => {
+    const current = getSettings();
+    const nextMode = current.renderMode === 'bars' ? 'heatmap' : 'bars';
+    updateSettings({ renderMode: nextMode });
+    console.log(`[arXiv-Charts] Render mode changed to ${nextMode}`);
   });
 }
