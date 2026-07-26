@@ -6,13 +6,69 @@
   "topNonNumRows": 2,
   "leftNonNumCols": 2,
   "metrics": [
-    { "colName": ["QQP", "363k"], "min": 64.8, "max": 72.1, "nullCount": 0, "highlightedCount": 1, "hasSd": false },
-    { "colName": ["QNLI", "108k"], "min": 79.8, "max": 92.7, "nullCount": 0, "highlightedCount": 1, "hasSd": false },
-    { "colName": ["SST-2", "67k"], "min": 90.4, "max": 94.9, "nullCount": 0, "highlightedCount": 1, "hasSd": false },
-    { "colName": ["CoLA", "8.5k"], "min": 35.0, "max": 60.5, "nullCount": 0, "highlightedCount": 1, "hasSd": false },
-    { "colName": ["STS-B", "5.7k"], "min": 73.3, "max": 86.5, "nullCount": 0, "highlightedCount": 1, "hasSd": false },
-    { "colName": ["MRPC", "3.5k"], "min": 82.3, "max": 89.3, "nullCount": 0, "highlightedCount": 1, "hasSd": false },
-    { "colName": ["RTE", "2.5k"], "min": 56.0, "max": 70.1, "nullCount": 0, "highlightedCount": 1, "hasSd": false },
-    { "colName": ["Average", "-"], "min": 71.0, "max": 82.1, "nullCount": 0, "highlightedCount": 1, "hasSd": false }
+    {
+      "colName": ["QQP", "363k"],
+      "min": 64.8,
+      "max": 72.1,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "colName": ["QNLI", "108k"],
+      "min": 79.8,
+      "max": 92.7,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "colName": ["SST-2", "67k"],
+      "min": 90.4,
+      "max": 94.9,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "colName": ["CoLA", "8.5k"],
+      "min": 35.0,
+      "max": 60.5,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "colName": ["STS-B", "5.7k"],
+      "min": 73.3,
+      "max": 86.5,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "colName": ["MRPC", "3.5k"],
+      "min": 82.3,
+      "max": 89.3,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "colName": ["RTE", "2.5k"],
+      "min": 56.0,
+      "max": 70.1,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "colName": ["Average", "-"],
+      "min": 71.0,
+      "max": 82.1,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    }
   ]
 }
