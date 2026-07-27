@@ -20,10 +20,10 @@ describe('Settings Management', () => {
   })
 
   it('updates settings and persists to localStorage', () => {
-    updateSettings({ autoVisualize: true, colorPalette: 'Set1' })
+    updateSettings({ autoVisualize: true, barColorScheme: 'Set1' })
     const settings = getSettings()
     expect(settings.autoVisualize).toBe(true)
-    expect(settings.colorPalette).toBe('Set1')
+    expect(settings.barColorScheme).toBe('Set1')
   })
 
   it('notifies listeners dynamically on settings change without reloading', () => {
@@ -33,13 +33,13 @@ describe('Settings Management', () => {
     updateSettings({ autoVisualize: true })
     expect(listener).toHaveBeenCalledWith({
       autoVisualize: true,
-      colorPalette: 'Pastel1',
-      colorMap: 'Cividis',
+      barColorScheme: 'Pastel1',
+      heatmapColorScheme: 'Cividis',
       renderMode: 'bars',
     })
 
     unsubscribe()
-    updateSettings({ colorPalette: 'Set1' })
+    updateSettings({ barColorScheme: 'Set1' })
     expect(listener).toHaveBeenCalledTimes(1)
   })
 

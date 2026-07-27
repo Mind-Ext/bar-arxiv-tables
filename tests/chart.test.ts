@@ -40,7 +40,7 @@ describe('Chart & Visualization Styling', () => {
 
   describe('Color Palette Cycling across columns', () => {
     it('applies cycled palette colors to different columns', () => {
-      updateSettings({ colorPalette: 'tab10' })
+      updateSettings({ barColorScheme: 'tab10' })
       // tab10 colors: #1f77b4 (rgb(31, 119, 180)), #ff7f0e (rgb(255, 127, 14)), #2ca02c ...
 
       const dom = new JSDOM(`
@@ -92,7 +92,7 @@ describe('Chart & Visualization Styling', () => {
     })
 
     it('applies heatmap background colors continuously when renderMode is heatmap', () => {
-      updateSettings({ colorMap: 'Viridis', renderMode: 'heatmap' })
+      updateSettings({ heatmapColorScheme: 'Viridis', renderMode: 'heatmap' })
 
       const dom = new JSDOM(`
         <figure>
@@ -131,6 +131,46 @@ describe('Chart & Visualization Styling', () => {
       expect(td1.style.background).toContain('linear-gradient(to right,')
       expect(td1.style.background).toContain('0.35')
       // Values at 0 and 100 should produce different heatmap colors along Viridis scale
+      expect(td0.style.background).not.toEqual(td1.style.background)
+    })
+
+    it('applies continuous colormap colors to bars in bar mode when barColorScheme is a colormap', () => {
+      updateSettings({ barColorScheme: 'Viridis', renderMode: 'bars' })
+
+      const dom = new JSDOM(`
+        <figure>
+          <table>
+            <tr><td>0</td></tr>
+            <tr><td>100</td></tr>
+          </table>
+        </figure>
+      `)
+
+      const table = dom.window.document.querySelector(
+        'table',
+      ) as HTMLTableElement
+      const td0 = table.rows[0].cells[0]
+      const td1 = table.rows[1].cells[0]
+
+      const parsed: ParsedTable = {
+        caption: 'Test Colormap Bars',
+        colNames: [['Val']],
+        rowNames: [['R1'], ['R2']],
+        topNonNumRows: 0,
+        leftNonNumCols: 0,
+        data: [
+          [{ value: 0, isHighlighted: false, raw: '0' }],
+          [{ value: 100, isHighlighted: false, raw: '100' }],
+        ],
+        domCells: [[td0], [td1]],
+        orientation: 'column',
+      }
+
+      applyInlineBars(parsed, table)
+
+      // Bar mode with colormap: low value (0%) and high value (100%) get different bar colors
+      expect(td0.style.background).toContain('linear-gradient(to right,')
+      expect(td1.style.background).toContain('linear-gradient(to right,')
       expect(td0.style.background).not.toEqual(td1.style.background)
     })
   })

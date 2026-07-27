@@ -1,6 +1,7 @@
 import { CellValue, ParsedTable } from './parser'
 import {
   getSettings,
+  isColormap,
   resolveColormapCycle,
   resolvePaletteCycle,
 } from './settings'
@@ -154,8 +155,12 @@ export function applyInlineBars(
 
   const settings = getSettings()
   const activeMode = overrideMode || settings.renderMode
-  const paletteCycle = resolvePaletteCycle(settings.colorPalette)
-  const colormapCycle = resolveColormapCycle(settings.colorMap)
+  const isBarColormap = isColormap(settings.barColorScheme)
+  const barColormapCycle = isBarColormap
+    ? resolveColormapCycle(settings.barColorScheme)
+    : null
+  const paletteCycle = resolvePaletteCycle(settings.barColorScheme)
+  const colormapCycle = resolveColormapCycle(settings.heatmapColorScheme)
 
   // Precompute per-column colors cycled from the active palette cycle for bars mode
   const columnBarColors: BarColors[] = []
@@ -202,11 +207,29 @@ export function applyInlineBars(
           `linear-gradient(to right, ${heatColor} 100%, transparent 100%)`
       } else {
         // Bar mode
+        let barColors = columnBarColors[c]
+        if (isBarColormap && barColormapCycle) {
+          const { min, max } = stats[c]
+          const norm = min === max
+            ? 0.5
+            : Math.max(0, Math.min(1, (cv.value - min) / (max - min)))
+          const interpolator = barColormapCycle[c % barColormapCycle.length]
+          const rgbStr = interpolator(norm)
+          const { r, g, b } = parseToRgb(rgbStr)
+          const colorStr = `rgba(${r}, ${g}, ${b}, ${BAR_OPACITY})`
+          const negStr = `rgba(244, 67, 54, ${BAR_OPACITY})`
+          barColors = {
+            pos: colorStr,
+            posAccent: colorStr,
+            neg: negStr,
+            negAccent: negStr,
+          }
+        }
         cell.style.background = buildGradient(
           cv.value,
           stats[c],
           cv.isHighlighted,
-          columnBarColors[c],
+          barColors,
         )
       }
     }

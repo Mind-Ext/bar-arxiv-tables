@@ -43,15 +43,15 @@ import {
 
 export interface Settings {
   autoVisualize: boolean
-  colorPalette: string
-  colorMap: string
+  barColorScheme: string
+  heatmapColorScheme: string
   renderMode: 'bars' | 'heatmap'
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   autoVisualize: false,
-  colorPalette: 'Pastel1',
-  colorMap: 'Cividis',
+  barColorScheme: 'Pastel1',
+  heatmapColorScheme: 'Cividis',
   renderMode: 'bars',
 }
 
@@ -158,8 +158,14 @@ export function _resetStorageForTesting(): void {
 export function getSettings(): Settings {
   return {
     autoVisualize: getValue('autoVisualize', DEFAULT_SETTINGS.autoVisualize),
-    colorPalette: getValue('colorPalette', DEFAULT_SETTINGS.colorPalette),
-    colorMap: getValue('colorMap', DEFAULT_SETTINGS.colorMap),
+    barColorScheme: getValue(
+      'barColorScheme',
+      getValue('colorPalette', DEFAULT_SETTINGS.barColorScheme),
+    ),
+    heatmapColorScheme: getValue(
+      'heatmapColorScheme',
+      getValue('colorMap', DEFAULT_SETTINGS.heatmapColorScheme),
+    ),
     renderMode: getValue('renderMode', DEFAULT_SETTINGS.renderMode),
   }
 }
@@ -174,11 +180,11 @@ export function updateSettings(partial: Partial<Settings>): Settings {
   if (partial.autoVisualize !== undefined) {
     setValue('autoVisualize', updated.autoVisualize)
   }
-  if (partial.colorPalette !== undefined) {
-    setValue('colorPalette', updated.colorPalette)
+  if (partial.barColorScheme !== undefined) {
+    setValue('barColorScheme', updated.barColorScheme)
   }
-  if (partial.colorMap !== undefined) {
-    setValue('colorMap', updated.colorMap)
+  if (partial.heatmapColorScheme !== undefined) {
+    setValue('heatmapColorScheme', updated.heatmapColorScheme)
   }
   if (partial.renderMode !== undefined) {
     setValue('renderMode', updated.renderMode)
@@ -246,6 +252,14 @@ export function resolvePaletteCycle(setting: string): string[][] {
 }
 
 /**
+ * Check if a setting string represents continuous colormap(s).
+ */
+export function isColormap(setting: string): boolean {
+  const parts = setting.split(',').map((s) => s.trim()).filter(Boolean)
+  return parts.length > 0 && parts.every((p) => Boolean(PRESET_COLORMAPS[p]))
+}
+
+/**
  * Resolve comma-separated colormap functions for cycling across columns in heatmap mode.
  */
 export function resolveColormapCycle(
@@ -269,8 +283,9 @@ export function initMenuCommands(): void {
   const autoVisLabel = `Toggle Auto-Visualize (${
     settings.autoVisualize ? 'ON' : 'OFF'
   })`
-  const paletteLabel = `Bar Color Palette (Current: ${settings.colorPalette})`
-  const mapLabel = `Heatmap Color Map (Current: ${settings.colorMap})`
+  const paletteLabel = `Bar Color Scheme (Current: ${settings.barColorScheme})`
+  const mapLabel =
+    `Heatmap Color Scheme (Current: ${settings.heatmapColorScheme})`
   const modeLabel = `Render Mode (Current: ${settings.renderMode})`
 
   GM_registerMenuCommand(autoVisLabel, () => {
@@ -283,19 +298,19 @@ export function initMenuCommands(): void {
   GM_registerMenuCommand(paletteLabel, () => {
     const current = getSettings()
     const presets = Object.keys(PRESET_PALETTES)
-    const currentIndex = presets.indexOf(current.colorPalette)
+    const currentIndex = presets.indexOf(current.barColorScheme)
     const nextPalette = presets[(currentIndex + 1) % presets.length]
-    updateSettings({ colorPalette: nextPalette })
-    console.log(`[arXiv-Charts] Color palette changed to ${nextPalette}`)
+    updateSettings({ barColorScheme: nextPalette })
+    console.log(`[arXiv-Charts] Bar color scheme changed to ${nextPalette}`)
   })
 
   GM_registerMenuCommand(mapLabel, () => {
     const current = getSettings()
     const maps = Object.keys(PRESET_COLORMAPS)
-    const currentIndex = maps.indexOf(current.colorMap)
+    const currentIndex = maps.indexOf(current.heatmapColorScheme)
     const nextMap = maps[(currentIndex + 1) % maps.length]
-    updateSettings({ colorMap: nextMap })
-    console.log(`[arXiv-Charts] Color map changed to ${nextMap}`)
+    updateSettings({ heatmapColorScheme: nextMap })
+    console.log(`[arXiv-Charts] Heatmap color scheme changed to ${nextMap}`)
   })
 
   GM_registerMenuCommand(modeLabel, () => {
