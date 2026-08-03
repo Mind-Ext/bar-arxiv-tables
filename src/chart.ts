@@ -1,6 +1,6 @@
 import { CellValue, ParsedTable } from './parser'
 import {
-  getSettings,
+  getEffectiveSettings,
   isColormap,
   resolveColormapCycle,
   resolvePaletteCycle,
@@ -20,6 +20,7 @@ interface ActiveVisualization {
   originalStyles: Map<HTMLTableCellElement, string>
   active: boolean
   mode: 'bars' | 'heatmap'
+  compositeKey?: string
 }
 
 // Store active visualizations keyed by table element
@@ -146,6 +147,7 @@ export function applyInlineBars(
   parsed: ParsedTable,
   table: HTMLTableElement,
   overrideMode?: 'bars' | 'heatmap',
+  compositeKey?: string,
 ): void {
   const { data, domCells } = parsed
   if (data.length === 0) return
@@ -153,8 +155,12 @@ export function applyInlineBars(
   const numCols = data[0].length
   const stats = computeColumnStats(data, numCols)
 
-  const settings = getSettings()
-  const activeMode = overrideMode || settings.renderMode
+  const settings = getEffectiveSettings(compositeKey)
+  const chartOpacity = settings.chartOpacity !== undefined
+    ? settings.chartOpacity
+    : 0.35
+  const activeMode = overrideMode ||
+    (settings.autoVisualize !== 'off' ? settings.autoVisualize : 'bars')
   const isBarColormap = isColormap(settings.barColorScheme)
   const barColormapCycle = isBarColormap
     ? resolveColormapCycle(settings.barColorScheme)
@@ -168,8 +174,8 @@ export function applyInlineBars(
     const palette = paletteCycle[c % paletteCycle.length]
     const baseColor = palette[c % palette.length]
     const { r, g, b } = parseToRgb(baseColor)
-    const colorStr = `rgba(${r}, ${g}, ${b}, ${BAR_OPACITY})`
-    const negStr = `rgba(244, 67, 54, ${BAR_OPACITY})`
+    const colorStr = `rgba(${r}, ${g}, ${b}, ${chartOpacity})`
+    const negStr = `rgba(244, 67, 54, ${chartOpacity})`
     columnBarColors.push({
       pos: colorStr,
       posAccent: colorStr,
@@ -202,7 +208,7 @@ export function applyInlineBars(
         const interpolator = colormapCycle[c % colormapCycle.length]
         const rgbStr = interpolator(norm)
         const { r, g, b } = parseToRgb(rgbStr)
-        const heatColor = `rgba(${r}, ${g}, ${b}, ${BAR_OPACITY})`
+        const heatColor = `rgba(${r}, ${g}, ${b}, ${chartOpacity})`
         cell.style.background =
           `linear-gradient(to right, ${heatColor} 100%, transparent 100%)`
       } else {
@@ -216,8 +222,8 @@ export function applyInlineBars(
           const interpolator = barColormapCycle[c % barColormapCycle.length]
           const rgbStr = interpolator(norm)
           const { r, g, b } = parseToRgb(rgbStr)
-          const colorStr = `rgba(${r}, ${g}, ${b}, ${BAR_OPACITY})`
-          const negStr = `rgba(244, 67, 54, ${BAR_OPACITY})`
+          const colorStr = `rgba(${r}, ${g}, ${b}, ${chartOpacity})`
+          const negStr = `rgba(244, 67, 54, ${chartOpacity})`
           barColors = {
             pos: colorStr,
             posAccent: colorStr,
@@ -240,6 +246,7 @@ export function applyInlineBars(
     originalStyles,
     active: true,
     mode: activeMode,
+    compositeKey,
   })
 }
 
@@ -265,6 +272,7 @@ export function toggleInlineBars(
   parsed: ParsedTable,
   table: HTMLTableElement,
   targetMode: 'bars' | 'heatmap' = 'bars',
+  compositeKey?: string,
 ): 'bars' | 'heatmap' | null {
   const viz = activeVisualizations.get(table)
   if (viz && viz.active) {
@@ -273,11 +281,11 @@ export function toggleInlineBars(
       return null
     } else {
       removeInlineBars(table)
-      applyInlineBars(parsed, table, targetMode)
+      applyInlineBars(parsed, table, targetMode, compositeKey)
       return targetMode
     }
   } else {
-    applyInlineBars(parsed, table, targetMode)
+    applyInlineBars(parsed, table, targetMode, compositeKey)
     return targetMode
   }
 }
@@ -296,11 +304,13 @@ export function getActiveVisualizationMode(
  * Re-render all active visualizations (e.g., after palette or mode change).
  */
 export function updateAllVisualizations(): void {
-  for (const [table, viz] of activeVisualizations) {
+  const entries = Array.from(activeVisualizations.entries())
+  for (const [table, viz] of entries) {
     if (viz.active) {
       const mode = viz.mode
+      const key = viz.compositeKey
       removeInlineBars(table)
-      applyInlineBars(viz.parsed, table, mode)
+      applyInlineBars(viz.parsed, table, mode, key)
     }
   }
 }

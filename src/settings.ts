@@ -41,19 +41,45 @@ import {
   schemeTableau10,
 } from 'd3-scale-chromatic'
 
+export type AutoVisualizeMode = 'off' | 'heatmap' | 'bars'
+
 export interface Settings {
-  autoVisualize: boolean
+  // Render Settings
+  autoVisualize: AutoVisualizeMode
+  buttonOpacity: number
+  chartOpacity: number
   barColorScheme: string
   heatmapColorScheme: string
-  renderMode: 'bars' | 'heatmap'
+
+  // Parser Settings
+  includeAllIntegerColumns: boolean
+  includeScientificNotation: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
-  autoVisualize: false,
+  autoVisualize: 'off',
+  buttonOpacity: 0.5,
+  chartOpacity: 0.35,
   barColorScheme: 'Pastel1',
   heatmapColorScheme: 'Cividis',
-  renderMode: 'bars',
+  includeAllIntegerColumns: false,
+  includeScientificNotation: false,
 }
+
+/** Per-table local settings override entry. */
+export interface LocalTableSetting {
+  lastUsed: number // Timestamp (Date.now())
+  settings: Partial<{
+    barColorScheme: string
+    heatmapColorScheme: string
+  }>
+}
+
+/** Map of composite keys to local table settings. */
+export type LocalSettingsMap = Record<string, LocalTableSetting>
+
+/** Maximum number of per-table local overrides stored. */
+export const LOCAL_SETTINGS_CAP = 1000
 
 /** Continuous D3 color scale interpolators (Sequential & Diverging) */
 export const PRESET_COLORMAPS: Record<string, (t: number) => string> = {
@@ -150,14 +176,47 @@ function setValue<T>(key: string, value: T): void {
  */
 export function _resetStorageForTesting(): void {
   memoryStore.clear()
+  try {
+    if (typeof localStorage !== 'undefined' && localStorage) {
+      localStorage.clear()
+    }
+  } catch {
+    // ignore
+  }
 }
 
 /**
  * Retrieve current user settings.
  */
 export function getSettings(): Settings {
+  const rawAutoVis = getValue<unknown>(
+    'autoVisualize',
+    DEFAULT_SETTINGS.autoVisualize,
+  )
+  let autoVisualize: AutoVisualizeMode = 'off'
+  if (rawAutoVis === true) {
+    const legacyMode = getValue<'bars' | 'heatmap'>('renderMode', 'bars')
+    autoVisualize = legacyMode === 'heatmap' ? 'heatmap' : 'bars'
+  } else if (
+    rawAutoVis === 'bars' ||
+    rawAutoVis === 'heatmap' ||
+    rawAutoVis === 'off'
+  ) {
+    autoVisualize = rawAutoVis
+  } else {
+    autoVisualize = 'off'
+  }
+
   return {
-    autoVisualize: getValue('autoVisualize', DEFAULT_SETTINGS.autoVisualize),
+    autoVisualize,
+    buttonOpacity: getValue<number>(
+      'buttonOpacity',
+      DEFAULT_SETTINGS.buttonOpacity,
+    ),
+    chartOpacity: getValue<number>(
+      'chartOpacity',
+      DEFAULT_SETTINGS.chartOpacity,
+    ),
     barColorScheme: getValue(
       'barColorScheme',
       getValue('colorPalette', DEFAULT_SETTINGS.barColorScheme),
@@ -166,7 +225,14 @@ export function getSettings(): Settings {
       'heatmapColorScheme',
       getValue('colorMap', DEFAULT_SETTINGS.heatmapColorScheme),
     ),
-    renderMode: getValue('renderMode', DEFAULT_SETTINGS.renderMode),
+    includeAllIntegerColumns: getValue<boolean>(
+      'includeAllIntegerColumns',
+      DEFAULT_SETTINGS.includeAllIntegerColumns,
+    ),
+    includeScientificNotation: getValue<boolean>(
+      'includeScientificNotation',
+      DEFAULT_SETTINGS.includeScientificNotation,
+    ),
   }
 }
 
@@ -180,14 +246,23 @@ export function updateSettings(partial: Partial<Settings>): Settings {
   if (partial.autoVisualize !== undefined) {
     setValue('autoVisualize', updated.autoVisualize)
   }
+  if (partial.buttonOpacity !== undefined) {
+    setValue('buttonOpacity', updated.buttonOpacity)
+  }
+  if (partial.chartOpacity !== undefined) {
+    setValue('chartOpacity', updated.chartOpacity)
+  }
   if (partial.barColorScheme !== undefined) {
     setValue('barColorScheme', updated.barColorScheme)
   }
   if (partial.heatmapColorScheme !== undefined) {
     setValue('heatmapColorScheme', updated.heatmapColorScheme)
   }
-  if (partial.renderMode !== undefined) {
-    setValue('renderMode', updated.renderMode)
+  if (partial.includeAllIntegerColumns !== undefined) {
+    setValue('includeAllIntegerColumns', updated.includeAllIntegerColumns)
+  }
+  if (partial.includeScientificNotation !== undefined) {
+    setValue('includeScientificNotation', updated.includeScientificNotation)
   }
 
   notifyListeners(updated)
@@ -270,6 +345,101 @@ export function resolveColormapCycle(
   return parts.map((name) => PRESET_COLORMAPS[name] || interpolateViridis)
 }
 
+// ---------------------------------------------------------------------------
+// Composite Key & Local Table Settings (LRU-Capped)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a composite key for per-table settings: `${paperId}#${tableId}`.
+ * Extracts paper ID from `window.location.pathname`, retaining version suffix.
+ */
+export function getTableCompositeKey(tableId: string): string {
+  const path = typeof window !== 'undefined' ? window.location.pathname : '/'
+  const m = /\/(?:html|abs|pdf)\/([^/]+)/.exec(path)
+  const paperId = m ? m[1] : path
+  return `${paperId}#${tableId}`
+}
+
+/**
+ * Read the local settings map from storage.
+ */
+export function getLocalTableSettings(
+  compositeKey: string,
+): LocalTableSetting | undefined {
+  const map = getValue<LocalSettingsMap>('localTableSettings', {})
+  const entry = map[compositeKey]
+  if (!entry) return undefined
+  // Bump lastUsed on read
+  entry.lastUsed = Date.now()
+  setValue('localTableSettings', map)
+  return entry
+}
+
+/**
+ * Write a local settings override, with LRU eviction when cap is exceeded.
+ */
+export function setLocalTableSettings(
+  compositeKey: string,
+  settings: Partial<{ barColorScheme: string; heatmapColorScheme: string }>,
+): void {
+  const map = getValue<LocalSettingsMap>('localTableSettings', {})
+  map[compositeKey] = { lastUsed: Date.now(), settings }
+
+  // LRU eviction
+  const keys = Object.keys(map)
+  if (keys.length > LOCAL_SETTINGS_CAP) {
+    const sorted = keys.sort(
+      (a, b) => (map[a].lastUsed ?? 0) - (map[b].lastUsed ?? 0),
+    )
+    const evictCount = keys.length - LOCAL_SETTINGS_CAP
+    for (let i = 0; i < evictCount; i++) {
+      delete map[sorted[i]]
+    }
+  }
+
+  setValue('localTableSettings', map)
+}
+
+/**
+ * Clear local override for a specific table, or all local overrides.
+ */
+export function clearLocalTableSettings(compositeKey?: string): void {
+  if (compositeKey) {
+    const map = getValue<LocalSettingsMap>('localTableSettings', {})
+    delete map[compositeKey]
+    setValue('localTableSettings', map)
+  } else {
+    setValue('localTableSettings', {})
+  }
+}
+
+/**
+ * Resolve effective settings for a table by merging local overrides onto
+ * global defaults. If no compositeKey or no local override exists, returns
+ * global settings unmodified.
+ */
+export function getEffectiveSettings(compositeKey?: string): Settings {
+  const global = getSettings()
+  if (!compositeKey) return global
+
+  const map = getValue<LocalSettingsMap>('localTableSettings', {})
+  const entry = map[compositeKey]
+  if (!entry) return global
+
+  const merged = { ...global }
+  if (entry.settings.barColorScheme !== undefined) {
+    merged.barColorScheme = entry.settings.barColorScheme
+  }
+  if (entry.settings.heatmapColorScheme !== undefined) {
+    merged.heatmapColorScheme = entry.settings.heatmapColorScheme
+  }
+  return merged
+}
+
+// ---------------------------------------------------------------------------
+// Menu Commands
+// ---------------------------------------------------------------------------
+
 /**
  * Register Tampermonkey / Violentmonkey menu commands if available.
  * Changing settings updates state in-place without page reload.
@@ -280,19 +450,19 @@ export function initMenuCommands(): void {
   }
 
   const settings = getSettings()
-  const autoVisLabel = `Toggle Auto-Visualize (${
-    settings.autoVisualize ? 'ON' : 'OFF'
-  })`
+  const autoVisLabel =
+    `Auto-Visualize (Current: ${settings.autoVisualize.toUpperCase()})`
   const paletteLabel = `Bar Color Scheme (Current: ${settings.barColorScheme})`
   const mapLabel =
     `Heatmap Color Scheme (Current: ${settings.heatmapColorScheme})`
-  const modeLabel = `Render Mode (Current: ${settings.renderMode})`
 
   GM_registerMenuCommand(autoVisLabel, () => {
     const current = getSettings()
-    const nextAutoVis = !current.autoVisualize
+    const modes: AutoVisualizeMode[] = ['off', 'bars', 'heatmap']
+    const nextIndex = (modes.indexOf(current.autoVisualize) + 1) % modes.length
+    const nextAutoVis = modes[nextIndex]
     updateSettings({ autoVisualize: nextAutoVis })
-    console.log(`[arXiv-Charts] Auto-visualize toggled to ${nextAutoVis}`)
+    console.log(`[arXiv-Charts] Auto-visualize mode changed to ${nextAutoVis}`)
   })
 
   GM_registerMenuCommand(paletteLabel, () => {
@@ -311,12 +481,5 @@ export function initMenuCommands(): void {
     const nextMap = maps[(currentIndex + 1) % maps.length]
     updateSettings({ heatmapColorScheme: nextMap })
     console.log(`[arXiv-Charts] Heatmap color scheme changed to ${nextMap}`)
-  })
-
-  GM_registerMenuCommand(modeLabel, () => {
-    const current = getSettings()
-    const nextMode = current.renderMode === 'bars' ? 'heatmap' : 'bars'
-    updateSettings({ renderMode: nextMode })
-    console.log(`[arXiv-Charts] Render mode changed to ${nextMode}`)
   })
 }

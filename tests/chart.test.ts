@@ -5,6 +5,7 @@ import {
   parseToRgb,
   removeInlineBars,
   toggleInlineBars,
+  updateAllVisualizations,
 } from '../src/chart'
 import { CandidateTable, injectButtons, ParsedTable } from '../src/parser'
 import { _resetStorageForTesting, updateSettings } from '../src/settings'
@@ -217,9 +218,9 @@ describe('Chart & Visualization Styling', () => {
         '.arxiv-chart-actions',
       ) as HTMLElement
       expect(actionsContainer).not.toBeNull()
-      expect(actionsContainer.style.position).toBe('absolute')
-      expect(actionsContainer.style.bottom).toBe('8px')
-      expect(actionsContainer.style.right).toBe('8px')
+      expect(actionsContainer.style.position).toBe('relative')
+      expect(actionsContainer.style.display).toBe('flex')
+      expect(actionsContainer.style.width).toBe('fit-content')
 
       const barsBtn = actionsContainer.querySelector(
         '.bars-btn',
@@ -236,7 +237,7 @@ describe('Chart & Visualization Styling', () => {
       expect(heatmapBtn).not.toBeNull()
       expect(heatmapBtn.classList.contains('inactive')).toBe(true)
       expect(heatmapBtn.style.filter).toBe('grayscale(100%)')
-      expect(heatmapBtn.innerHTML).toContain('🏳️‍🌈')
+      expect(heatmapBtn.innerHTML).toContain('🌈')
     })
 
     it('toggles bars and heatmap modes mutually exclusively', () => {
@@ -278,6 +279,35 @@ describe('Chart & Visualization Styling', () => {
       // Toggle off heatmap mode
       mode = toggleInlineBars(parsed, table, 'heatmap')
       expect(mode).toBeNull()
+    })
+
+    it('updateAllVisualizations re-renders active visualizations without looping infinitely', () => {
+      const dom = new JSDOM(`
+        <table>
+          <tr><td>10</td></tr>
+          <tr><td>20</td></tr>
+        </table>
+      `)
+      const table = dom.window.document.querySelector(
+        'table',
+      ) as HTMLTableElement
+      const parsed: ParsedTable = {
+        caption: 'Test',
+        colNames: [['V']],
+        rowNames: [['R1'], ['R2']],
+        topNonNumRows: 0,
+        leftNonNumCols: 0,
+        data: [[{ value: 10, isHighlighted: false, raw: '10' }], [{
+          value: 20,
+          isHighlighted: false,
+          raw: '20',
+        }]],
+        domCells: [[table.rows[0].cells[0]], [table.rows[1].cells[0]]],
+        orientation: 'column',
+      }
+
+      applyInlineBars(parsed, table, 'bars', 'test#t1')
+      expect(() => updateAllVisualizations()).not.toThrow()
     })
   })
 })

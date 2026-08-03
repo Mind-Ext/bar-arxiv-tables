@@ -580,6 +580,31 @@ export interface CandidateTable {
   figure: HTMLElement
   table: HTMLTableElement
   parsed: ParsedTable
+  id: string
+}
+
+/**
+ * Extract a stable table ID from available DOM attributes and content.
+ * Resolution order:
+ *   1. `table.id` (if non-empty)
+ *   2. `figure.id` (if non-empty)
+ *   3. `figcaption` text matching /table\s+(\d+|[a-z0-9.]+)/i
+ *   4. Candidate index fallback (`"table-0"`, `"table-1"`, …)
+ */
+export function extractTableId(
+  table: HTMLTableElement,
+  figure?: HTMLElement | null,
+  figcaption?: HTMLElement | null,
+  index?: number,
+): string {
+  if (table.id) return table.id
+  if (figure?.id) return figure.id
+  if (figcaption) {
+    const text = figcaption.textContent || ''
+    const m = /table\s+(\d+|[a-z0-9.]+)/i.exec(text)
+    if (m) return `table-${m[1].toLowerCase()}`
+  }
+  return `table-${index ?? 0}`
 }
 
 /**
@@ -592,6 +617,7 @@ export function discoverTables(root: ParentNode = document): CandidateTable[] {
   // Query all tables inside <figure> elements
   const tables = root.querySelectorAll('figure > table')
 
+  let candidateIndex = 0
   for (const table of Array.from(tables)) {
     const figure = table.parentElement
     if (!figure) continue
@@ -609,7 +635,9 @@ export function discoverTables(root: ParentNode = document): CandidateTable[] {
     // values and not all integers
     if (!hasQualifyingNumericColumn(parsed)) continue
 
-    candidates.push({ figure, table: tableEl, parsed })
+    const id = extractTableId(tableEl, figure, figcaption, candidateIndex)
+    candidates.push({ figure, table: tableEl, parsed, id })
+    candidateIndex++
   }
 
   return candidates
@@ -651,13 +679,19 @@ export type VisualizeCallback = (
   btn: HTMLButtonElement,
 ) => void
 
+export type SettingsCallback = (
+  candidate: CandidateTable,
+  btn: HTMLButtonElement,
+) => void
+
 /**
- * Inject rotated emoji button (bars) and rainbow flag emoji button (heatmap)
- * at the bottom-right of each candidate table.
+ * Inject rotated emoji button (bars), rainbow flag emoji button (heatmap),
+ * and gear button (⚙️ settings) at the bottom-right of each candidate table.
  */
 export function injectButtons(
   candidates: CandidateTable[],
   onVisualize: VisualizeCallback,
+  onSettings?: SettingsCallback,
 ): void {
   for (const candidate of candidates) {
     const parent = candidate.table.parentElement
@@ -685,12 +719,12 @@ export function injectButtons(
     const actionsContainer = document.createElement('div')
     actionsContainer.className = 'arxiv-chart-actions'
     actionsContainer.style.cssText = `
-      position: absolute;
-      bottom: 8px;
-      right: 8px;
-      z-index: 10;
-      display: inline-flex;
+      display: flex;
       gap: 4px;
+      padding: 4px 0;
+      position: relative;
+      width: fit-content;
+      margin-left: auto;
     `
 
     const commonBtnStyle = `
@@ -704,9 +738,9 @@ export function injectButtons(
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
       filter: grayscale(100%);
-      transition: filter 0.2s ease, transform 0.1s ease;
+      opacity: 0.5;
+      transition: filter 0.2s ease, opacity 0.2s ease, transform 0.1s ease;
     `
 
     // 1. Bars button (📊 rotated 90deg)
@@ -721,11 +755,11 @@ export function injectButtons(
       () => onVisualize(candidate, 'bars', barsBtn),
     )
 
-    // 2. Heatmap button (🏳️‍🌈 rainbow flag)
+    // 2. Heatmap button (🌈 rainbow)
     const heatmapBtn = document.createElement('button')
     heatmapBtn.className = 'arxiv-chart-btn heatmap-btn inactive'
     heatmapBtn.title = 'Toggle Heatmap Overlay'
-    heatmapBtn.innerHTML = '<span style="display: inline-block;">🏳️‍🌈</span>'
+    heatmapBtn.innerHTML = '<span style="display: inline-block;">🌈</span>'
     heatmapBtn.style.cssText = commonBtnStyle
     heatmapBtn.addEventListener(
       'click',
@@ -734,6 +768,38 @@ export function injectButtons(
 
     actionsContainer.appendChild(barsBtn)
     actionsContainer.appendChild(heatmapBtn)
+
+    // 3. Gear settings button (⚙️)
+    if (onSettings) {
+      const gearBtn = document.createElement('button')
+      gearBtn.className = 'arxiv-chart-btn gear-btn'
+      gearBtn.title = 'Table Settings'
+      gearBtn.innerHTML = '<span style="display: inline-block;">⚙️</span>'
+      gearBtn.style.cssText = commonBtnStyle
+      gearBtn.addEventListener(
+        'click',
+        () => onSettings(candidate, gearBtn),
+      )
+      actionsContainer.appendChild(gearBtn)
+    }
+
+    // Hover: reveal buttons at full opacity
+    actionsContainer.addEventListener('mouseenter', () => {
+      for (const btn of actionsContainer.querySelectorAll('.arxiv-chart-btn')) {
+        ;(btn as HTMLElement).style.opacity = '1'
+        ;(btn as HTMLElement).style.filter = 'none'
+      }
+    })
+    actionsContainer.addEventListener('mouseleave', () => {
+      for (const btn of actionsContainer.querySelectorAll('.arxiv-chart-btn')) {
+        const isActive = btn.classList.contains('active')
+        if (!isActive) {
+          ;(btn as HTMLElement).style.opacity = '0.5'
+          ;(btn as HTMLElement).style.filter = 'grayscale(100%)'
+        }
+      }
+    })
+
     wrapper.appendChild(actionsContainer)
   }
 }
