@@ -7,7 +7,12 @@ import {
   toggleInlineBars,
   updateAllVisualizations,
 } from '../src/chart'
-import { CandidateTable, injectButtons, ParsedTable } from '../src/parser'
+import {
+  CandidateTable,
+  discoverTables,
+  injectButtons,
+  ParsedTable,
+} from '../src/parser'
 import { _resetStorageForTesting, updateSettings } from '../src/settings'
 
 describe('Chart & Visualization Styling', () => {
@@ -212,7 +217,7 @@ describe('Chart & Visualization Styling', () => {
       injectButtons(candidates, () => {})
 
       const wrapper = table.parentElement as HTMLElement
-      expect(wrapper.classList.contains('arxiv-chart-wrapper')).toBe(true)
+      expect(wrapper.classList.contains('bar-arxiv-table-wrapper')).toBe(true)
 
       const actionsContainer = wrapper.querySelector(
         '.arxiv-chart-actions',
@@ -238,6 +243,38 @@ describe('Chart & Visualization Styling', () => {
       expect(heatmapBtn.classList.contains('inactive')).toBe(true)
       expect(heatmapBtn.style.filter).toBe('grayscale(100%)')
       expect(heatmapBtn.innerHTML).toContain('🌈')
+    })
+
+    it('injects buttons for multiple sibling tables in the same parent container', () => {
+      const dom = new JSDOM(`
+        <div class="container">
+          <table id="t1">
+            <thead><tr><th>A</th><th>B</th></tr></thead>
+            <tbody>
+              <tr><td>X</td><td>1.5</td></tr>
+              <tr><td>Y</td><td>2.5</td></tr>
+              <tr><td>Z</td><td>3.5</td></tr>
+            </tbody>
+          </table>
+          <table id="t2">
+            <thead><tr><th>A</th><th>B</th></tr></thead>
+            <tbody>
+              <tr><td>X</td><td>4.5</td></tr>
+              <tr><td>Y</td><td>5.5</td></tr>
+              <tr><td>Z</td><td>6.5</td></tr>
+            </tbody>
+          </table>
+        </div>
+      `)
+      const candidates = discoverTables(dom.window.document)
+      expect(candidates).toHaveLength(2)
+      injectButtons(candidates, () => {})
+      const t1Wrapper = candidates[0].table.parentElement as HTMLElement
+      const t2Wrapper = candidates[1].table.parentElement as HTMLElement
+      expect(t1Wrapper.classList.contains('bar-arxiv-table-wrapper')).toBe(true)
+      expect(t2Wrapper.classList.contains('bar-arxiv-table-wrapper')).toBe(true)
+      expect(t1Wrapper.querySelector('.arxiv-chart-actions')).not.toBeNull()
+      expect(t2Wrapper.querySelector('.arxiv-chart-actions')).not.toBeNull()
     })
 
     it('toggles bars and heatmap modes mutually exclusively', () => {

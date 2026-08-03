@@ -261,8 +261,14 @@ export function extractRowNames(
  * Sanitize a raw cell string for numeric parsing.
  * Strips LaTeX, HTML artifacts, special symbols, etc.
  */
+/**
+ * Sanitize a raw cell string for numeric parsing.
+ * Strips LaTeX, HTML artifacts, special symbols, etc.
+ */
 export function sanitizeForParse(raw: string): string {
   let s = raw
+  // Replace Unicode minus signs and dashes with ASCII '-'
+  s = s.replace(/[\u2212\u2010\u2011\u2012\u2013\u2014]/g, '-')
   // Remove HTML tags (leftover from textContent shouldn't have many,
   // but just in case)
   s = s.replace(/<[^>]+>/g, '')
@@ -277,6 +283,8 @@ export function sanitizeForParse(raw: string): string {
   s = s.replace(/[%‰†‡*]/g, '')
   // Collapse whitespace
   s = s.replace(/\s+/g, ' ').trim()
+  // Remove space between sign and number (e.g. "- 0.0297" -> "-0.0297")
+  s = s.replace(/([+-])\s+(?=\d)/g, '$1')
   return s
 }
 
@@ -404,7 +412,7 @@ export function extractBody(
 
 /**
  * Parse an HTML table element into a ParsedTable.
- * The table must be inside a <figure> with a <figcaption>.
+ * Caption will be extracted from figure/container or table if present.
  */
 export function parseTable(
   table: HTMLTableElement,
@@ -412,11 +420,15 @@ export function parseTable(
 ): ParsedTable {
   // Caption extraction
   let caption: string | null = null
-  if (figure) {
-    const figcaption = figure.querySelector('figcaption')
-    if (figcaption) {
-      caption = extractCaption(figcaption.textContent || '')
-    }
+  const container = figure ||
+    (table.closest('figure, .ltx_table') as HTMLElement | null) ||
+    table.parentElement
+
+  const captionEl = container?.querySelector('figcaption, .ltx_caption') ||
+    table.querySelector('caption, .ltx_caption')
+
+  if (captionEl) {
+    caption = extractCaption(captionEl.textContent || '')
   }
 
   // Grid expansion
@@ -506,33 +518,58 @@ function extractCellText(cell: HTMLTableCellElement): string {
   for (const nested of Array.from(clone.querySelectorAll('table'))) {
     nested.remove()
   }
-  // Also remove <annotation> elements (LaTeX source)
-  for (const ann of Array.from(clone.querySelectorAll('annotation'))) {
+  // Also remove <annotation> and <annotation-xml> elements (LaTeX / MathML metadata)
+  for (
+    const ann of Array.from(
+      clone.querySelectorAll('annotation, annotation-xml'),
+    )
+  ) {
     ann.remove()
   }
   return (clone.textContent || '').replace(/\s+/g, ' ').trim()
 }
 
+/** Check if a single DOM element is bold (via tags, classes, or inline style). */
+function isBoldElement(el: Element): boolean {
+  const tag = el.tagName.toUpperCase()
+  if (tag === 'B' || tag === 'STRONG') return true
+  if (
+    el.classList.contains('ltx_font_bold') ||
+    el.classList.contains('bold') ||
+    el.classList.contains('fw-bold') ||
+    el.classList.contains('font-bold') ||
+    el.classList.contains('font-weight-bold')
+  ) {
+    return true
+  }
+  const inlineStyle = (el as HTMLElement).style?.fontWeight
+  if (inlineStyle) {
+    const fw = parseInt(inlineStyle, 10)
+    if (!isNaN(fw) && fw >= 600) return true
+    if (
+      inlineStyle.toLowerCase() === 'bold' ||
+      inlineStyle.toLowerCase() === 'bolder'
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
 /** Detect if a cell's content is bold. */
 function detectBold(cell: HTMLTableCellElement): boolean {
-  // Check direct wrapping in <b>, <strong>
-  if (cell.querySelector(':scope > b, :scope > strong')) return true
-  if (cell.querySelector(':scope > span.ltx_text.ltx_font_bold')) return true
-  // Check if the cell itself has bold class
-  if (cell.classList.contains('ltx_font_bold')) return true
-  // Check all child spans
-  const spans = cell.querySelectorAll(
-    'span.ltx_font_bold, span.ltx_text.ltx_font_bold',
-  )
-  if (spans.length > 0) {
-    // Verify the bold span wraps the main content (not just a label)
-    const boldText = Array.from(spans)
-      .map((s) => s.textContent || '')
+  if (isBoldElement(cell)) return true
+
+  const allElements = Array.from(cell.querySelectorAll('*'))
+  const boldElements = allElements.filter((el) => isBoldElement(el))
+  if (boldElements.length > 0) {
+    const boldText = boldElements
+      .map((el) => el.textContent || '')
       .join('')
     const cellText = extractCellText(cell)
-    // Bold if the bold spans cover most of the cell content
     if (
-      boldText.trim() && cellText.trim() &&
+      boldText.trim() &&
+      cellText.trim() &&
       boldText.trim().length >= cellText.trim().length * 0.5
     ) {
       return true
@@ -541,11 +578,29 @@ function detectBold(cell: HTMLTableCellElement): boolean {
   return false
 }
 
+/** Check if a single DOM element is underlined (via tags, classes, or inline style). */
+function isUnderlineElement(el: Element): boolean {
+  const tag = el.tagName.toUpperCase()
+  if (tag === 'U' || tag === 'INS') return true
+  if (
+    el.classList.contains('ltx_font_underline') ||
+    el.classList.contains('underline') ||
+    el.classList.contains('text-underline') ||
+    el.classList.contains('text-decoration-underline')
+  ) {
+    return true
+  }
+  const inlineTd = (el as HTMLElement).style?.textDecoration ||
+    (el as HTMLElement).style?.textDecorationLine
+  if (inlineTd && inlineTd.toLowerCase().includes('underline')) return true
+  return false
+}
+
 /** Detect if a cell's content is underlined. */
 function detectUnderline(cell: HTMLTableCellElement): boolean {
-  if (cell.querySelector(':scope > u')) return true
-  if (cell.querySelector('span.ltx_font_underline')) return true
-  return false
+  if (isUnderlineElement(cell)) return true
+  const allElements = Array.from(cell.querySelectorAll('*'))
+  return allElements.some((el) => isUnderlineElement(el))
 }
 
 /** Check if a value is a missing-data marker. */
@@ -577,7 +632,7 @@ function extractCaption(raw: string): string {
 // ---------------------------------------------------------------------------
 
 export interface CandidateTable {
-  figure: HTMLElement
+  figure?: HTMLElement
   table: HTMLTableElement
   parsed: ParsedTable
   id: string
@@ -587,8 +642,8 @@ export interface CandidateTable {
  * Extract a stable table ID from available DOM attributes and content.
  * Resolution order:
  *   1. `table.id` (if non-empty)
- *   2. `figure.id` (if non-empty)
- *   3. `figcaption` text matching /table\s+(\d+|[a-z0-9.]+)/i
+ *   2. `figure.id` or container ID (if non-empty)
+ *   3. `figcaption` / caption text matching /table\s+(\d+|[a-z0-9.]+)/i
  *   4. Candidate index fallback (`"table-0"`, `"table-1"`, …)
  */
 export function extractTableId(
@@ -599,8 +654,13 @@ export function extractTableId(
 ): string {
   if (table.id) return table.id
   if (figure?.id) return figure.id
-  if (figcaption) {
-    const text = figcaption.textContent || ''
+  const container = figure || table.closest('figure, .ltx_table')
+  if (container?.id) return container.id
+  const capEl = figcaption ||
+    container?.querySelector('figcaption, .ltx_caption') ||
+    table.querySelector('caption, .ltx_caption')
+  if (capEl) {
+    const text = capEl.textContent || ''
     const m = /table\s+(\d+|[a-z0-9.]+)/i.exec(text)
     if (m) return `table-${m[1].toLowerCase()}`
   }
@@ -609,24 +669,33 @@ export function extractTableId(
 
 /**
  * Discover all data tables on the page.
+ * Supports table.ltx_tabular, tables within figures, and standalone tables.
  * Returns candidate tables that pass the numerical-column filter.
  */
 export function discoverTables(root: ParentNode = document): CandidateTable[] {
   const candidates: CandidateTable[] = []
 
-  // Query all tables inside <figure> elements
-  const tables = root.querySelectorAll('figure > table')
+  // Query table.ltx_tabular elements, tables inside figures, and standard tables
+  const tableElements = Array.from(
+    new Set(
+      Array.from(
+        root.querySelectorAll<HTMLTableElement>(
+          'table.ltx_tabular, figure > table, table',
+        ),
+      ),
+    ),
+  )
 
   let candidateIndex = 0
-  for (const table of Array.from(tables)) {
-    const figure = table.parentElement
-    if (!figure) continue
+  for (const tableEl of tableElements) {
+    // Skip nested inner tables (tables inside cells of another table)
+    if (tableEl.parentElement?.closest('table')) continue
 
-    // Must have a figcaption
-    const figcaption = figure.querySelector('figcaption')
-    if (!figcaption) continue
+    const figure = (tableEl.closest('figure, .ltx_table') ||
+      tableEl.parentElement) as HTMLElement | undefined
 
-    const tableEl = table as HTMLTableElement
+    const figcaption = (figure?.querySelector('figcaption, .ltx_caption') ||
+      tableEl.querySelector('caption, .ltx_caption')) as HTMLElement | undefined
 
     // Parse the table
     const parsed = parseTable(tableEl, figure)
@@ -697,21 +766,26 @@ export function injectButtons(
     const parent = candidate.table.parentElement
     if (!parent) continue
 
-    // Don't inject twice
-    if (parent.querySelector('.arxiv-chart-actions')) continue
+    // Don't inject twice for the same table
+    if (
+      parent.classList.contains('bar-arxiv-table-wrapper') &&
+      parent.querySelector(':scope > .arxiv-chart-actions')
+    ) {
+      continue
+    }
 
     // Wrap table in relative wrapper if not already wrapped
     let wrapper: HTMLElement = parent
-    if (!parent.classList.contains('arxiv-chart-wrapper')) {
+    if (!parent.classList.contains('bar-arxiv-table-wrapper')) {
       const div = document.createElement('div')
-      div.className = 'arxiv-chart-wrapper'
+      div.className = 'bar-arxiv-table-wrapper'
       div.style.cssText =
         'position: relative; display: inline-block; max-width: 100%;'
       candidate.table.parentNode?.insertBefore(div, candidate.table)
       div.appendChild(candidate.table)
       wrapper = div
     } else {
-      if (getComputedStyle(wrapper).position === 'static') {
+      if (!wrapper.style.position || wrapper.style.position === 'static') {
         wrapper.style.position = 'relative'
       }
     }

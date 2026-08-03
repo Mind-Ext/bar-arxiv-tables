@@ -108,17 +108,23 @@ describe('Fixture-based parser tests', () => {
           readFileSync(expectedPath, 'utf-8'),
         )
 
-        // Find the table
-        const figure = dom.window.document.querySelector(
-          'figure',
-        ) as HTMLElement
-        const table = figure?.querySelector('table') as HTMLTableElement
+        // Find the table and optional figure wrapper
+        const table = dom.window.document.querySelector(
+          'table',
+        ) as HTMLTableElement
+        const figure = (table?.closest('figure') ||
+          undefined) as HTMLElement | undefined
 
         // Expand grid
         const { grid, totalRows, totalCols } = expandGrid(table)
 
         // Parse
         const parsed = parseTable(table, figure)
+
+        it('discovers table via discoverTables', () => {
+          const candidates = discoverTables(dom.window.document)
+          expect(candidates.length).toBeGreaterThanOrEqual(1)
+        })
 
         it('grid dimensions match', () => {
           expect(totalRows).toBe(expected.totalRowCount)
@@ -198,4 +204,44 @@ describe('Fixture-based parser tests', () => {
       })
     }
   }
+})
+
+describe('enhanced style detection (bold / underline)', () => {
+  it('detects bold from inline styles and classes', () => {
+    const html = `
+      <table>
+        <thead><tr><th>Model</th><th>Score</th></tr></thead>
+        <tbody>
+          <tr><td>A</td><td style="font-weight: 700">95.0</td></tr>
+          <tr><td>B</td><td class="fw-bold">92.1</td></tr>
+          <tr><td>C</td><td><span style="font-weight: bold">90.5</span></td></tr>
+        </tbody>
+      </table>
+    `
+    const dom = new JSDOM(html)
+    const table = dom.window.document.querySelector('table') as HTMLTableElement
+    const parsed = parseTable(table)
+    expect(parsed.data[0][0].isHighlighted).toBe(true)
+    expect(parsed.data[1][0].isHighlighted).toBe(true)
+    expect(parsed.data[2][0].isHighlighted).toBe(true)
+  })
+
+  it('detects underline from tags, classes, and inline styles', () => {
+    const html = `
+      <table>
+        <thead><tr><th>Model</th><th>Score</th></tr></thead>
+        <tbody>
+          <tr><td>A</td><td><ins>95.0</ins></td></tr>
+          <tr><td>B</td><td class="text-underline">92.1</td></tr>
+          <tr><td>C</td><td style="text-decoration: underline">90.5</td></tr>
+        </tbody>
+      </table>
+    `
+    const dom = new JSDOM(html)
+    const table = dom.window.document.querySelector('table') as HTMLTableElement
+    const parsed = parseTable(table)
+    expect(parsed.data[0][0].isHighlighted).toBe(true)
+    expect(parsed.data[1][0].isHighlighted).toBe(true)
+    expect(parsed.data[2][0].isHighlighted).toBe(true)
+  })
 })

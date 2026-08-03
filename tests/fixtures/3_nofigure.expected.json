@@ -1,0 +1,26 @@
+{
+  "caption": null,
+  "orientation": "column",
+  "totalRowCount": 13,
+  "totalColCount": 3,
+  "topNonNumRows": 1,
+  "leftNonNumCols": 1,
+  "metrics": [
+    {
+      "colName": ["Factor Return"],
+      "min": -0.0583,
+      "max": 0.0721,
+      "nullCount": 0,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "colName": ["Sharpe Ratio"],
+      "min": -0.19,
+      "max": 0.21,
+      "nullCount": 0,
+      "highlightedCount": 0,
+      "hasSd": false
+    }
+  ]
+}
