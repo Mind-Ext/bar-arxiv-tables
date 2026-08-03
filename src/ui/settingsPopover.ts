@@ -30,11 +30,13 @@ let cleanupOnClose: (() => void) | null = null
  * Inject the settings popover CSS into the document head (once).
  */
 function cssOnce(): void {
-  if (document.getElementById('arxiv-chart-settings-styles')) return
+  if (document.getElementById('b-a-t-settings-styles')) {
+    return
+  }
   const style = document.createElement('style')
-  style.id = 'arxiv-chart-settings-styles'
+  style.id = 'b-a-t-settings-styles'
   style.textContent = `
-    .arxiv-settings-popover {
+    .b-a-t-settings-popover {
       z-index: 10000;
       width: 340px;
       background: white;
@@ -46,7 +48,7 @@ function cssOnce(): void {
       color: #333;
       margin-top: 8px;
     }
-    .arxiv-settings-header {
+    .b-a-t-settings-header {
       background: #f8f9fa;
       padding: 10px 15px;
       border-bottom: 1px solid #e9ecef;
@@ -58,11 +60,11 @@ function cssOnce(): void {
       cursor: grab;
       user-select: none;
     }
-    .arxiv-settings-tabs {
+    .b-a-t-settings-tabs {
       display: flex;
       border-bottom: 1px solid #e9ecef;
     }
-    .arxiv-settings-tab {
+    .b-a-t-settings-tab {
       padding: 8px 15px;
       cursor: pointer;
       flex: 1;
@@ -71,41 +73,41 @@ function cssOnce(): void {
       border-bottom: 2px solid transparent;
       color: #666;
     }
-    .arxiv-settings-tab.active {
+    .b-a-t-settings-tab.active {
       background: white;
       border-bottom-color: #495057;
       color: #212529;
       font-weight: 500;
     }
-    .arxiv-settings-panel {
+    .b-a-t-settings-panel {
       display: none;
       padding: 15px;
     }
-    .arxiv-settings-panel.active {
+    .b-a-t-settings-panel.active {
       display: block;
     }
-    .arxiv-settings-group {
+    .b-a-t-settings-group {
       margin-bottom: 15px;
     }
-    .arxiv-settings-group-title {
+    .b-a-t-settings-group-title {
       font-weight: 600;
       margin-bottom: 10px;
       color: #444;
       border-bottom: 1px solid #eee;
       padding-bottom: 4px;
     }
-    .arxiv-settings-field {
+    .b-a-t-settings-field {
       margin-bottom: 10px;
       display: flex;
       flex-direction: column;
     }
-    .arxiv-settings-field label {
+    .b-a-t-settings-field label {
       margin-bottom: 4px;
       font-weight: 500;
     }
-    .arxiv-settings-field select,
-    .arxiv-settings-field input[type="text"],
-    .arxiv-settings-field input[type="number"] {
+    .b-a-t-settings-field select,
+    .b-a-t-settings-field input[type="text"],
+    .b-a-t-settings-field input[type="number"] {
       width: 100%;
       padding: 6px;
       border: 1px solid #d1d5da;
@@ -113,15 +115,15 @@ function cssOnce(): void {
       box-sizing: border-box;
       font-size: 13px;
     }
-    .arxiv-settings-field-checkbox {
+    .b-a-t-settings-field-checkbox {
       display: flex;
       align-items: center;
       margin-bottom: 8px;
     }
-    .arxiv-settings-field-checkbox input {
+    .b-a-t-settings-field-checkbox input {
       margin-right: 8px;
     }
-    .arxiv-settings-footer {
+    .b-a-t-settings-footer {
       display: flex;
       justify-content: flex-end;
       gap: 10px;
@@ -129,7 +131,7 @@ function cssOnce(): void {
       padding-top: 15px;
       border-top: 1px solid #eaecef;
     }
-    .arxiv-btn {
+    .b-a-t-btn {
       padding: 6px 12px;
       cursor: pointer;
       border: 1px solid #d1d5da;
@@ -138,18 +140,18 @@ function cssOnce(): void {
       font-size: 13px;
       font-weight: 500;
     }
-    .arxiv-btn:hover {
+    .b-a-t-btn:hover {
       background: #f3f4f6;
     }
-    .arxiv-btn-primary {
+    .b-a-t-btn-primary {
       background: #495057;
       color: white;
       border-color: #495057;
     }
-    .arxiv-btn-primary:hover {
+    .b-a-t-btn-primary:hover {
       background: #343a40;
     }
-    .arxiv-settings-badge {
+    .b-a-t-settings-badge {
       display: inline-block;
       padding: 4px 8px;
       border-radius: 12px;
@@ -157,22 +159,22 @@ function cssOnce(): void {
       font-weight: 600;
       margin-bottom: 12px;
     }
-    .arxiv-badge-global {
+    .b-a-t-badge-global {
       background: #f1f3f5;
       color: #495057;
     }
-    .arxiv-badge-custom {
+    .b-a-t-badge-custom {
       background: #e9ecef;
       color: #343a40;
     }
-    .arxiv-settings-custom-input {
+    .b-a-t-settings-custom-input {
       margin-top: 6px;
       display: none;
     }
-    .arxiv-settings-custom-input.active {
+    .b-a-t-settings-custom-input.active {
       display: block;
     }
-    .arxiv-close-btn {
+    .b-a-t-close-btn {
       cursor: pointer;
       background: none;
       border: none;
@@ -181,7 +183,7 @@ function cssOnce(): void {
       color: #6a737d;
       padding: 0;
     }
-    .arxiv-close-btn:hover {
+    .b-a-t-close-btn:hover {
       color: #24292e;
     }
   `
@@ -280,47 +282,47 @@ export function toggleSettingsPopover(
   const heatOptions = getOptionsHTML(false)
 
   const popover = document.createElement('div')
-  popover.className = 'arxiv-settings-popover'
+  popover.className = 'b-a-t-settings-popover'
   popover.innerHTML = `
-    <div class="arxiv-settings-header">
+    <div class="b-a-t-settings-header">
       <span>Settings</span>
-      <button class="arxiv-close-btn" data-action="close">&times;</button>
+      <button class="b-a-t-close-btn" data-action="close">&times;</button>
     </div>
-    <div class="arxiv-settings-tabs">
-      <div class="arxiv-settings-tab active" data-tab="local">Current Table</div>
-      <div class="arxiv-settings-tab" data-tab="global">Global Defaults</div>
+    <div class="b-a-t-settings-tabs">
+      <div class="b-a-t-settings-tab active" data-tab="local">Current Table</div>
+      <div class="b-a-t-settings-tab" data-tab="global">Global Defaults</div>
     </div>
 
-    <div class="arxiv-settings-panel active" data-panel="local">
-      <div id="local-status-badge" class="arxiv-settings-badge arxiv-badge-global">Using Global Defaults</div>
+    <div class="b-a-t-settings-panel active" data-panel="local">
+      <div id="local-status-badge" class="b-a-t-settings-badge b-a-t-badge-global">Using Global Defaults</div>
 
-      <div class="arxiv-settings-field">
+      <div class="b-a-t-settings-field">
         <label>Bar Color Scheme</label>
         <select name="local-barColorScheme">
           ${barOptions}
         </select>
-        <input type="text" class="arxiv-settings-custom-input" data-custom-input="local-barColorScheme" placeholder="#ff5733, #33ff57">
+        <input type="text" class="b-a-t-settings-custom-input" data-custom-input="local-barColorScheme" placeholder="#ff5733, #33ff57">
       </div>
 
-      <div class="arxiv-settings-field">
+      <div class="b-a-t-settings-field">
         <label>Heatmap Color Scheme</label>
         <select name="local-heatmapColorScheme">
           ${heatOptions}
         </select>
-        <input type="text" class="arxiv-settings-custom-input" data-custom-input="local-heatmapColorScheme" placeholder="#ff5733, #33ff57">
+        <input type="text" class="b-a-t-settings-custom-input" data-custom-input="local-heatmapColorScheme" placeholder="#ff5733, #33ff57">
       </div>
 
-      <div class="arxiv-settings-footer">
-        <button class="arxiv-btn" data-action="reset-local">Reset to Global</button>
-        <button class="arxiv-btn arxiv-btn-primary" data-action="apply">Save for Table</button>
+      <div class="b-a-t-settings-footer">
+        <button class="b-a-t-btn" data-action="reset-local">Reset to Global</button>
+        <button class="b-a-t-btn b-a-t-btn-primary" data-action="apply">Save for Table</button>
       </div>
     </div>
 
-    <div class="arxiv-settings-panel" data-panel="global">
-      <div class="arxiv-settings-group">
-        <div class="arxiv-settings-group-title">Render Settings</div>
+    <div class="b-a-t-settings-panel" data-panel="global">
+      <div class="b-a-t-settings-group">
+        <div class="b-a-t-settings-group-title">Render Settings</div>
 
-        <div class="arxiv-settings-field">
+        <div class="b-a-t-settings-field">
           <label>Auto-Visualize</label>
           <select name="autoVisualize">
             <option value="off">Off</option>
@@ -329,50 +331,50 @@ export function toggleSettingsPopover(
           </select>
         </div>
 
-        <div class="arxiv-settings-field">
+        <div class="b-a-t-settings-field">
           <label>Bar Color Scheme</label>
           <select name="barColorScheme">
             ${barOptions}
           </select>
-          <input type="text" class="arxiv-settings-custom-input" data-custom-input="barColorScheme" placeholder="#ff5733, #33ff57">
+          <input type="text" class="b-a-t-settings-custom-input" data-custom-input="barColorScheme" placeholder="#ff5733, #33ff57">
         </div>
 
-        <div class="arxiv-settings-field">
+        <div class="b-a-t-settings-field">
           <label>Heatmap Color Scheme</label>
           <select name="heatmapColorScheme">
             ${heatOptions}
           </select>
-          <input type="text" class="arxiv-settings-custom-input" data-custom-input="heatmapColorScheme" placeholder="#ff5733, #33ff57">
+          <input type="text" class="b-a-t-settings-custom-input" data-custom-input="heatmapColorScheme" placeholder="#ff5733, #33ff57">
         </div>
 
-        <div class="arxiv-settings-field">
+        <div class="b-a-t-settings-field">
           <label>Chart Opacity</label>
           <input type="number" name="chartOpacity" min="0" max="1" step="0.05" placeholder="0.35">
         </div>
 
-        <div class="arxiv-settings-field">
+        <div class="b-a-t-settings-field">
           <label>Button Opacity</label>
           <input type="number" name="buttonOpacity" min="0" max="1" step="0.05" placeholder="0.5">
         </div>
       </div>
 
-      <div class="arxiv-settings-group">
-        <div class="arxiv-settings-group-title">Parser Settings</div>
+      <div class="b-a-t-settings-group">
+        <div class="b-a-t-settings-group-title">Parser Settings</div>
 
-        <div class="arxiv-settings-field-checkbox">
+        <div class="b-a-t-settings-field-checkbox">
           <input type="checkbox" name="includeAllIntegerColumns" id="cb-int">
           <label for="cb-int">Include All-Integer Columns</label>
         </div>
 
-        <div class="arxiv-settings-field-checkbox">
+        <div class="b-a-t-settings-field-checkbox">
           <input type="checkbox" name="includeScientificNotation" id="cb-sci">
           <label for="cb-sci">Include Scientific Notation</label>
         </div>
       </div>
 
-      <div class="arxiv-settings-footer">
-        <button class="arxiv-btn" data-action="reset-global">Reset to Defaults</button>
-        <button class="arxiv-btn arxiv-btn-primary" data-action="save-global">Save Global</button>
+      <div class="b-a-t-settings-footer">
+        <button class="b-a-t-btn" data-action="reset-global">Reset to Defaults</button>
+        <button class="b-a-t-btn b-a-t-btn-primary" data-action="save-global">Save Global</button>
       </div>
     </div>
   `
@@ -401,7 +403,7 @@ export function toggleSettingsPopover(
 
   // --- Drag support via header ---
   const header = popover.querySelector(
-    '.arxiv-settings-header',
+    '.b-a-t-settings-header',
   ) as HTMLElement
   let isDragging = false
   let dragOffsetX = 0
@@ -517,10 +519,10 @@ export function toggleSettingsPopover(
 
     if (isCustom) {
       els.localStatus.textContent = 'Custom Override Active'
-      els.localStatus.className = 'arxiv-settings-badge arxiv-badge-custom'
+      els.localStatus.className = 'b-a-t-settings-badge b-a-t-badge-custom'
     } else {
       els.localStatus.textContent = 'Using Global Defaults'
-      els.localStatus.className = 'arxiv-settings-badge arxiv-badge-global'
+      els.localStatus.className = 'b-a-t-settings-badge b-a-t-badge-global'
     }
   }
 

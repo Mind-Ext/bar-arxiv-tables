@@ -15,13 +15,13 @@ import { toggleSettingsPopover } from '../src/ui/settingsPopover'
 
 function createAnchor(): HTMLElement {
   const el = document.createElement('div')
-  el.className = 'arxiv-chart-actions'
+  el.className = 'b-a-t-actions'
   document.body.appendChild(el)
   return el
 }
 
 function getPopover(): HTMLElement | null {
-  return document.querySelector('.arxiv-settings-popover')
+  return document.querySelector('.b-a-t-settings-popover')
 }
 
 function clickAction(action: string): void {
@@ -97,7 +97,7 @@ describe('Settings Popover UI', () => {
 
       toggleSettingsPopover(anchor2, 'paper#t2', onUpdate)
       // Only one popover should exist
-      const popovers = document.querySelectorAll('.arxiv-settings-popover')
+      const popovers = document.querySelectorAll('.b-a-t-settings-popover')
       expect(popovers.length).toBe(1)
     })
 
@@ -184,7 +184,7 @@ describe('Settings Popover UI', () => {
       toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
       const badge = getPopover()!.querySelector('#local-status-badge')!
       expect(badge.textContent).toBe('Using Global Defaults')
-      expect(badge.classList.contains('arxiv-badge-global')).toBe(true)
+      expect(badge.classList.contains('b-a-t-badge-global')).toBe(true)
     })
 
     it('shows "Custom Override Active" when local override exists', () => {
@@ -192,7 +192,7 @@ describe('Settings Popover UI', () => {
       toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
       const badge = getPopover()!.querySelector('#local-status-badge')!
       expect(badge.textContent).toBe('Custom Override Active')
-      expect(badge.classList.contains('arxiv-badge-custom')).toBe(true)
+      expect(badge.classList.contains('b-a-t-badge-custom')).toBe(true)
     })
   })
 
@@ -483,7 +483,9 @@ describe('Settings Popover UI', () => {
   describe('CSS injection', () => {
     it('injects style tag on first open', () => {
       toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
-      const style = document.getElementById('arxiv-chart-settings-styles')
+      const style = document.getElementById(
+        'b-a-t-settings-styles',
+      )
       expect(style).not.toBeNull()
       expect(style!.tagName.toLowerCase()).toBe('style')
     })
@@ -494,7 +496,7 @@ describe('Settings Popover UI', () => {
       toggleSettingsPopover(anchor, 'paper#t1', onUpdate) // reopen
 
       const styles = document.querySelectorAll(
-        '#arxiv-chart-settings-styles',
+        '#b-a-t-settings-styles',
       )
       expect(styles.length).toBe(1)
     })
@@ -516,7 +518,7 @@ describe('Settings Popover UI', () => {
       toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
       const popover = getPopover()!
       const header = popover.querySelector(
-        '.arxiv-settings-header',
+        '.b-a-t-settings-header',
       ) as HTMLElement
 
       header.dispatchEvent(

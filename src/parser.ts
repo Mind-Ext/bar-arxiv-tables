@@ -767,38 +767,16 @@ export function injectButtons(
     if (!parent) continue
 
     // Don't inject twice for the same table
-    if (
-      parent.classList.contains('bar-arxiv-table-wrapper') &&
-      parent.querySelector(':scope > .arxiv-chart-actions')
-    ) {
+    if (candidate.table.querySelector('.b-a-t-actions')) {
       continue
     }
 
-    // Wrap table in relative wrapper if not already wrapped
-    let wrapper: HTMLElement = parent
-    if (!parent.classList.contains('bar-arxiv-table-wrapper')) {
-      const div = document.createElement('div')
-      div.className = 'bar-arxiv-table-wrapper'
-      div.style.cssText =
-        'position: relative; display: inline-block; max-width: 100%;'
-      candidate.table.parentNode?.insertBefore(div, candidate.table)
-      div.appendChild(candidate.table)
-      wrapper = div
-    } else {
-      if (!wrapper.style.position || wrapper.style.position === 'static') {
-        wrapper.style.position = 'relative'
-      }
-    }
-
     const actionsContainer = document.createElement('div')
-    actionsContainer.className = 'arxiv-chart-actions'
+    actionsContainer.className = 'b-a-t-actions'
     actionsContainer.style.cssText = `
-      display: flex;
+      display: inline-flex;
       gap: 4px;
       padding: 4px 0;
-      position: relative;
-      width: fit-content;
-      margin-left: auto;
     `
 
     const commonBtnStyle = `
@@ -819,7 +797,7 @@ export function injectButtons(
 
     // 1. Bars button (📊 rotated 90deg)
     const barsBtn = document.createElement('button')
-    barsBtn.className = 'arxiv-chart-btn bars-btn inactive'
+    barsBtn.className = 'b-a-t-btn b-a-t-bars-btn inactive'
     barsBtn.title = 'Toggle Bar Chart Overlay'
     barsBtn.innerHTML =
       '<span style="display: inline-block; transform: rotate(90deg);">📊</span>'
@@ -831,7 +809,7 @@ export function injectButtons(
 
     // 2. Heatmap button (🌈 rainbow)
     const heatmapBtn = document.createElement('button')
-    heatmapBtn.className = 'arxiv-chart-btn heatmap-btn inactive'
+    heatmapBtn.className = 'b-a-t-btn b-a-t-heatmap-btn inactive'
     heatmapBtn.title = 'Toggle Heatmap Overlay'
     heatmapBtn.innerHTML = '<span style="display: inline-block;">🌈</span>'
     heatmapBtn.style.cssText = commonBtnStyle
@@ -846,7 +824,7 @@ export function injectButtons(
     // 3. Gear settings button (⚙️)
     if (onSettings) {
       const gearBtn = document.createElement('button')
-      gearBtn.className = 'arxiv-chart-btn gear-btn'
+      gearBtn.className = 'b-a-t-btn b-a-t-gear-btn'
       gearBtn.title = 'Table Settings'
       gearBtn.innerHTML = '<span style="display: inline-block;">⚙️</span>'
       gearBtn.style.cssText = commonBtnStyle
@@ -859,13 +837,21 @@ export function injectButtons(
 
     // Hover: reveal buttons at full opacity
     actionsContainer.addEventListener('mouseenter', () => {
-      for (const btn of actionsContainer.querySelectorAll('.arxiv-chart-btn')) {
+      for (
+        const btn of actionsContainer.querySelectorAll(
+          '.b-a-t-btn',
+        )
+      ) {
         ;(btn as HTMLElement).style.opacity = '1'
         ;(btn as HTMLElement).style.filter = 'none'
       }
     })
     actionsContainer.addEventListener('mouseleave', () => {
-      for (const btn of actionsContainer.querySelectorAll('.arxiv-chart-btn')) {
+      for (
+        const btn of actionsContainer.querySelectorAll(
+          '.b-a-t-btn',
+        )
+      ) {
         const isActive = btn.classList.contains('active')
         if (!isActive) {
           ;(btn as HTMLElement).style.opacity = '0.5'
@@ -874,7 +860,33 @@ export function injectButtons(
       }
     })
 
-    wrapper.appendChild(actionsContainer)
+    let tfoot = candidate.table.querySelector('tfoot')
+    if (!tfoot) {
+      tfoot = document.createElement('tfoot')
+      candidate.table.appendChild(tfoot)
+    }
+
+    let maxColSpan = 1
+    if (candidate.table.rows.length > 0) {
+      let cols = 0
+      for (const cell of Array.from(candidate.table.rows[0].cells)) {
+        cols += cell.colSpan || 1
+      }
+      maxColSpan = cols
+    }
+
+    const tr = document.createElement('tr')
+    tr.style.cssText =
+      'border: none !important; background: transparent !important;'
+
+    const td = document.createElement('td')
+    td.colSpan = maxColSpan || 100
+    td.style.cssText =
+      'border: none !important; padding: 0 !important; background: transparent !important; text-align: right !important;'
+
+    td.appendChild(actionsContainer)
+    tr.appendChild(td)
+    tfoot.appendChild(tr)
   }
 }
 

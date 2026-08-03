@@ -34,11 +34,11 @@ if (typeof GM_registerMenuCommand !== 'undefined') {
   GM_registerMenuCommand('⚙️ Open Global Settings', () => {
     // Create or reuse a floating anchor for the global settings popover
     let anchor = document.getElementById(
-      'arxiv-chart-global-settings-anchor',
+      'b-a-t-global-settings-anchor',
     )
     if (!anchor) {
       anchor = document.createElement('div')
-      anchor.id = 'arxiv-chart-global-settings-anchor'
+      anchor.id = 'b-a-t-global-settings-anchor'
       anchor.style.cssText =
         'position: fixed; top: 60px; right: 20px; z-index: 10001;'
       document.body.appendChild(anchor)
@@ -58,10 +58,10 @@ function updateButtonGroupState(
   activeMode: 'bars' | 'heatmap' | null,
 ): void {
   if (!container) return
-  const barsBtn = container.querySelector('.bars-btn') as
+  const barsBtn = container.querySelector('.b-a-t-bars-btn') as
     | HTMLButtonElement
     | null
-  const heatmapBtn = container.querySelector('.heatmap-btn') as
+  const heatmapBtn = container.querySelector('.b-a-t-heatmap-btn') as
     | HTMLButtonElement
     | null
 
@@ -102,7 +102,9 @@ function handleVisualize(
     mode,
     compositeKey,
   )
-  const container = btn.closest('.arxiv-chart-actions') as HTMLElement | null
+  const container = btn.closest('.b-a-t-actions') as
+    | HTMLElement
+    | null
   updateButtonGroupState(container, activeMode)
 }
 
@@ -129,7 +131,7 @@ function processPage(): void {
       const compositeKey = getTableCompositeKey(candidate.id)
       applyInlineBars(candidate.parsed, candidate.table, autoVis, compositeKey)
       const container = candidate.table.parentElement?.querySelector(
-        '.arxiv-chart-actions',
+        '.b-a-t-actions',
       ) as HTMLElement | null
       updateButtonGroupState(container, autoVis)
     }

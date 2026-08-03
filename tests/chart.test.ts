@@ -216,19 +216,18 @@ describe('Chart & Visualization Styling', () => {
 
       injectButtons(candidates, () => {})
 
-      const wrapper = table.parentElement as HTMLElement
-      expect(wrapper.classList.contains('bar-arxiv-table-wrapper')).toBe(true)
-
-      const actionsContainer = wrapper.querySelector(
-        '.arxiv-chart-actions',
+      const actionsContainer = table.querySelector(
+        '.b-a-t-actions',
       ) as HTMLElement
       expect(actionsContainer).not.toBeNull()
-      expect(actionsContainer.style.position).toBe('relative')
-      expect(actionsContainer.style.display).toBe('flex')
-      expect(actionsContainer.style.width).toBe('fit-content')
+      expect(actionsContainer.parentElement?.tagName).toBe('TD')
+      expect(
+        actionsContainer.parentElement?.parentElement?.parentElement?.tagName,
+      ).toBe('TFOOT')
+      expect(actionsContainer.style.display).toBe('inline-flex')
 
       const barsBtn = actionsContainer.querySelector(
-        '.bars-btn',
+        '.b-a-t-bars-btn',
       ) as HTMLButtonElement
       expect(barsBtn).not.toBeNull()
       expect(barsBtn.classList.contains('inactive')).toBe(true)
@@ -237,7 +236,7 @@ describe('Chart & Visualization Styling', () => {
       expect(barsBtn.innerHTML).toContain('📊')
 
       const heatmapBtn = actionsContainer.querySelector(
-        '.heatmap-btn',
+        '.b-a-t-heatmap-btn',
       ) as HTMLButtonElement
       expect(heatmapBtn).not.toBeNull()
       expect(heatmapBtn.classList.contains('inactive')).toBe(true)
@@ -269,12 +268,14 @@ describe('Chart & Visualization Styling', () => {
       const candidates = discoverTables(dom.window.document)
       expect(candidates).toHaveLength(2)
       injectButtons(candidates, () => {})
-      const t1Wrapper = candidates[0].table.parentElement as HTMLElement
-      const t2Wrapper = candidates[1].table.parentElement as HTMLElement
-      expect(t1Wrapper.classList.contains('bar-arxiv-table-wrapper')).toBe(true)
-      expect(t2Wrapper.classList.contains('bar-arxiv-table-wrapper')).toBe(true)
-      expect(t1Wrapper.querySelector('.arxiv-chart-actions')).not.toBeNull()
-      expect(t2Wrapper.querySelector('.arxiv-chart-actions')).not.toBeNull()
+      const t1Actions = candidates[0].table.querySelector(
+        '.b-a-t-actions',
+      ) as HTMLElement
+      const t2Actions = candidates[1].table.querySelector(
+        '.b-a-t-actions',
+      ) as HTMLElement
+      expect(t1Actions).not.toBeNull()
+      expect(t2Actions).not.toBeNull()
     })
 
     it('toggles bars and heatmap modes mutually exclusively', () => {
