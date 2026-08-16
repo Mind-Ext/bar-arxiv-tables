@@ -22,10 +22,15 @@ import {
   updateAllVisualizations,
 } from './chart'
 import { toggleSettingsPopover } from './ui/settingsPopover'
+import { destroyCitationPopup, initCitationPopup } from './extra/citationPopup'
 
 console.log('[arXiv-Charts] Initializing arXiv Chart Visualizer...')
 const settings = getSettings()
 console.log('[arXiv-Charts] Current settings:', settings)
+
+if (settings.enableCitationPopup) {
+  initCitationPopup()
+}
 
 initMenuCommands()
 
@@ -166,5 +171,10 @@ observeForNewTables((newCandidates) => {
 
 onSettingsChange((updatedSettings) => {
   console.log('[arXiv-Charts] Settings updated in-place:', updatedSettings)
+  if (updatedSettings.enableCitationPopup) {
+    initCitationPopup()
+  } else {
+    destroyCitationPopup()
+  }
   updateAllVisualizations()
 })

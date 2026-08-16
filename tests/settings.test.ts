@@ -45,6 +45,7 @@ describe('Settings Management', () => {
       heatmapColorScheme: 'Cividis',
       includeAllIntegerColumns: false,
       includeScientificNotation: false,
+      enableCitationPopup: false,
     })
 
     unsubscribe()

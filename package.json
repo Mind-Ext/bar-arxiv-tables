@@ -5,7 +5,10 @@
   "main": "index.js",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "dev:extra": "vite --config vite.extra.config.js",
+    "build:tables": "vite build",
+    "build:extra": "vite build --config vite.extra.config.js",
+    "build": "vite build && vite build --config vite.extra.config.js",
     "test": "vitest",
     "fmt": "deno fmt --single-quote --no-semicolons src/ tests/",
     "fmt:check": "deno fmt --check --single-quote --no-semicolons src/ tests/"

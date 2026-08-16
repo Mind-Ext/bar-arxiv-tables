@@ -372,6 +372,15 @@ export function toggleSettingsPopover(
         </div>
       </div>
 
+      <div class="b-a-t-settings-group">
+        <div class="b-a-t-settings-group-title">Extra Features</div>
+
+        <div class="b-a-t-settings-field-checkbox">
+          <input type="checkbox" name="enableCitationPopup" id="cb-cite">
+          <label for="cb-cite">Citation Popup on Click</label>
+        </div>
+      </div>
+
       <div class="b-a-t-settings-footer">
         <button class="b-a-t-btn" data-action="reset-global">Reset to Defaults</button>
         <button class="b-a-t-btn b-a-t-btn-primary" data-action="save-global">Save Global</button>
@@ -470,6 +479,9 @@ export function toggleSettingsPopover(
     globalButtonOpacity: q<HTMLInputElement>('[name="buttonOpacity"]'),
     globalIncInt: q<HTMLInputElement>('[name="includeAllIntegerColumns"]'),
     globalIncSci: q<HTMLInputElement>('[name="includeScientificNotation"]'),
+    globalEnableCitationPopup: q<HTMLInputElement>(
+      '[name="enableCitationPopup"]',
+    ),
   }
 
   // --- Helpers ---
@@ -554,6 +566,7 @@ export function toggleSettingsPopover(
       buttonOpacity: isNaN(btnOp) ? DEFAULT_SETTINGS.buttonOpacity : btnOp,
       includeAllIntegerColumns: els.globalIncInt.checked,
       includeScientificNotation: els.globalIncSci.checked,
+      enableCitationPopup: els.globalEnableCitationPopup.checked,
     }
     updateSettings(draftGlobal)
     updateBadge()
@@ -589,6 +602,7 @@ export function toggleSettingsPopover(
     els.globalButtonOpacity.value = globalSettings.buttonOpacity.toString()
     els.globalIncInt.checked = globalSettings.includeAllIntegerColumns
     els.globalIncSci.checked = globalSettings.includeScientificNotation
+    els.globalEnableCitationPopup.checked = globalSettings.enableCitationPopup
 
     updateBadge()
   }
@@ -705,6 +719,7 @@ export function toggleSettingsPopover(
           buttonOpacity: isNaN(btnOp) ? DEFAULT_SETTINGS.buttonOpacity : btnOp,
           includeAllIntegerColumns: els.globalIncInt.checked,
           includeScientificNotation: els.globalIncSci.checked,
+          enableCitationPopup: els.globalEnableCitationPopup.checked,
         }
         updateSettings(newSettings)
         isSaved = true

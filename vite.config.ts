@@ -28,6 +28,9 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    emptyOutDir: false,
+  },
   test: {
     environment: 'jsdom',
   },

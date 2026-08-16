@@ -54,6 +54,9 @@ export interface Settings {
   // Parser Settings
   includeAllIntegerColumns: boolean
   includeScientificNotation: boolean
+
+  // Extra Features
+  enableCitationPopup: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -64,6 +67,7 @@ export const DEFAULT_SETTINGS: Settings = {
   heatmapColorScheme: 'Cividis',
   includeAllIntegerColumns: false,
   includeScientificNotation: false,
+  enableCitationPopup: false,
 }
 
 /** Per-table local settings override entry. */
@@ -233,6 +237,10 @@ export function getSettings(): Settings {
       'includeScientificNotation',
       DEFAULT_SETTINGS.includeScientificNotation,
     ),
+    enableCitationPopup: getValue<boolean>(
+      'enableCitationPopup',
+      DEFAULT_SETTINGS.enableCitationPopup,
+    ),
   }
 }
 
@@ -263,6 +271,9 @@ export function updateSettings(partial: Partial<Settings>): Settings {
   }
   if (partial.includeScientificNotation !== undefined) {
     setValue('includeScientificNotation', updated.includeScientificNotation)
+  }
+  if (partial.enableCitationPopup !== undefined) {
+    setValue('enableCitationPopup', updated.enableCitationPopup)
   }
 
   notifyListeners(updated)
