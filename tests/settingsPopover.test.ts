@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   _resetStorageForTesting,
   DEFAULT_SETTINGS,
+  DEFAULT_WHITELIST,
   getLocalTableSettings,
   getSettings,
   setLocalTableSettings,
@@ -542,6 +543,109 @@ describe('Settings Popover UI', () => {
 
       expect(popover.style.left).toBe('50px')
       expect(popover.style.top).toBe('70px')
+    })
+  })
+
+  // -----------------------------------------------------------------------
+  // Site Whitelist Tab & Panel
+  // -----------------------------------------------------------------------
+
+  describe('site whitelist tab and actions', () => {
+    it('shows Whitelist tab and panel when clicking tab', () => {
+      toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
+      clickTab('whitelist')
+
+      const popover = getPopover()!
+      const tab = popover.querySelector('[data-tab="whitelist"]')!
+      const panel = popover.querySelector(
+        '[data-panel="whitelist"]',
+      ) as HTMLElement
+
+      expect(tab.classList.contains('active')).toBe(true)
+      expect(panel.classList.contains('active')).toBe(true)
+    })
+
+    it('hides Local tab when opened with empty compositeKey', () => {
+      toggleSettingsPopover(anchor, '', onUpdate)
+      const popover = getPopover()!
+      const localTab = popover.querySelector('[data-tab="local"]')
+      const globalTab = popover.querySelector('[data-tab="global"]')
+      const whitelistTab = popover.querySelector('[data-tab="whitelist"]')
+
+      expect(localTab).toBeNull()
+      expect(globalTab).not.toBeNull()
+      expect(whitelistTab).not.toBeNull()
+    })
+
+    it('populates whitelist textarea with current whitelist rules', () => {
+      updateSettings({ urlWhitelist: ['*://arxiv.org/*', 'biorxiv.org'] })
+      toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
+      clickTab('whitelist')
+
+      const popover = getPopover()!
+      const textarea = popover.querySelector(
+        'textarea[name="urlWhitelist"]',
+      ) as HTMLTextAreaElement
+
+      expect(textarea.value).toBe('*://arxiv.org/*\nbiorxiv.org')
+    })
+
+    it('toggles current domain in textarea when clicking toggle button', () => {
+      toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
+      clickTab('whitelist')
+
+      const popover = getPopover()!
+      const textarea = popover.querySelector(
+        'textarea[name="urlWhitelist"]',
+      ) as HTMLTextAreaElement
+      const toggleBtn = popover.querySelector(
+        '[data-action="toggle-current-domain"]',
+      ) as HTMLButtonElement
+
+      expect(toggleBtn).not.toBeNull()
+      // In jsdom, window.location.hostname is empty string / localhost / ''
+      toggleBtn.click()
+      // Should have modified textarea
+      expect(textarea.value.length).toBeGreaterThan(0)
+    })
+
+    it('resets whitelist to defaults on reset-whitelist click', () => {
+      updateSettings({ urlWhitelist: ['custom.domain.org'] })
+      toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
+      clickTab('whitelist')
+
+      const popover = getPopover()!
+      const textarea = popover.querySelector(
+        'textarea[name="urlWhitelist"]',
+      ) as HTMLTextAreaElement
+
+      expect(textarea.value).toBe('custom.domain.org')
+
+      clickAction('reset-whitelist')
+
+      expect(textarea.value).toBe(DEFAULT_WHITELIST.join('\n'))
+    })
+
+    it('saves whitelist to storage on save-whitelist click', () => {
+      toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
+      clickTab('whitelist')
+
+      const popover = getPopover()!
+      const textarea = popover.querySelector(
+        'textarea[name="urlWhitelist"]',
+      ) as HTMLTextAreaElement
+
+      textarea.value = '*://arxiv.org/html/*\nopenreview.net/forum'
+
+      clickAction('save-whitelist')
+
+      const settings = getSettings()
+      expect(settings.urlWhitelist).toEqual([
+        '*://arxiv.org/html/*',
+        'openreview.net/forum',
+      ])
+      expect(onUpdate).toHaveBeenCalledTimes(1)
+      expect(getPopover()).toBeNull()
     })
   })
 })

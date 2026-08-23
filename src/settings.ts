@@ -54,7 +54,16 @@ export interface Settings {
   // Parser Settings
   includeAllIntegerColumns: boolean
   includeScientificNotation: boolean
+
+  // Site Scope & Whitelist
+  urlWhitelist: string[]
 }
+
+export const DEFAULT_WHITELIST: string[] = [
+  '*://arxiv.org/html/*',
+  '*://ar5iv.labs.arxiv.org/html/*',
+  'file:///*.html',
+]
 
 export const DEFAULT_SETTINGS: Settings = {
   autoVisualize: 'off',
@@ -64,6 +73,7 @@ export const DEFAULT_SETTINGS: Settings = {
   heatmapColorScheme: 'Cividis',
   includeAllIntegerColumns: false,
   includeScientificNotation: false,
+  urlWhitelist: DEFAULT_WHITELIST,
 }
 
 /** Per-table local settings override entry. */
@@ -233,6 +243,10 @@ export function getSettings(): Settings {
       'includeScientificNotation',
       DEFAULT_SETTINGS.includeScientificNotation,
     ),
+    urlWhitelist: getValue<string[]>(
+      'urlWhitelist',
+      DEFAULT_SETTINGS.urlWhitelist,
+    ),
   }
 }
 
@@ -264,9 +278,130 @@ export function updateSettings(partial: Partial<Settings>): Settings {
   if (partial.includeScientificNotation !== undefined) {
     setValue('includeScientificNotation', updated.includeScientificNotation)
   }
+  if (partial.urlWhitelist !== undefined) {
+    setValue('urlWhitelist', updated.urlWhitelist)
+  }
 
   notifyListeners(updated)
   return updated
+}
+
+// ---------------------------------------------------------------------------
+// URL Whitelist & Scope Matching
+// ---------------------------------------------------------------------------
+
+/**
+ * Compile a glob string into a RegExp.
+ */
+function globToRegExp(glob: string, anchored = true): RegExp | null {
+  const escaped = glob
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*/g, '.*')
+    .replace(/\?/g, '.')
+  try {
+    return new RegExp(anchored ? `^${escaped}$` : escaped, 'i')
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Test if a URL matches a whitelist rule.
+ *
+ * Supported formats:
+ * 1. Raw Regex: `/pattern/flags` (e.g. `/\/html\/\d{4}\.\d{4,5}/i`)
+ * 2. Explicit Scheme Glob: contains `://` (e.g. `*://arxiv.org/html/*`, `file:///*.html`)
+ * 3. Domain or Domain/Path: (e.g. `biorxiv.org`, `openreview.net/forum`, `*.nature.com`)
+ *    - Validated via native URL parser against hostname and pathname boundaries.
+ */
+export function matchesRule(url: string, rule: string): boolean {
+  const trimmed = rule.trim()
+  if (!trimmed || trimmed.startsWith('#')) return false // ignore comments & blank lines
+
+  // 1. Raw Regex: /pattern/flags
+  const regexMatch = trimmed.match(/^\/(.+)\/([a-z]*)$/i)
+  if (regexMatch) {
+    try {
+      return new RegExp(regexMatch[1], regexMatch[2] || 'i').test(url)
+    } catch {
+      return false
+    }
+  }
+
+  // 2. Explicit Scheme Glob: contains :// (e.g. *://arxiv.org/*, file:///*.html)
+  if (trimmed.includes('://')) {
+    return globToRegExp(trimmed, true)?.test(url) ?? false
+  }
+
+  // 3. Domain or Domain/Path mode via native URL parser
+  try {
+    const parsed = new URL(url)
+    const host = parsed.hostname.toLowerCase()
+
+    const firstSlash = trimmed.indexOf('/')
+    const ruleDomain = (
+      firstSlash !== -1 ? trimmed.slice(0, firstSlash) : trimmed
+    ).toLowerCase()
+    const rulePath = firstSlash !== -1 ? trimmed.slice(firstSlash) : ''
+
+    const hostMatches = ruleDomain.includes('*') || ruleDomain.includes('?')
+      ? (globToRegExp(ruleDomain)?.test(host) ?? false)
+      : (host === ruleDomain || host.endsWith(`.${ruleDomain}`))
+
+    if (!hostMatches) return false
+
+    if (rulePath) {
+      if (rulePath.includes('*') || rulePath.includes('?')) {
+        const re = globToRegExp(
+          rulePath.endsWith('*') ? rulePath : `${rulePath}*`,
+          true,
+        )
+        return re?.test(parsed.pathname) ?? false
+      }
+      return parsed.pathname.toLowerCase().startsWith(rulePath.toLowerCase())
+    }
+
+    return true
+  } catch {
+    return globToRegExp(trimmed, false)?.test(url) ?? false
+  }
+}
+
+/**
+ * Check whether a URL matches any rule in the whitelist.
+ */
+export function isUrlAllowed(url: string, whitelist: string[]): boolean {
+  return whitelist.some((rule) => matchesRule(url, rule))
+}
+
+/**
+ * Helper to add a domain or rule to the whitelist if not already present.
+ */
+export function addRuleToWhitelist(rule: string): Settings {
+  const current = getSettings()
+  const trimmed = rule.trim()
+  if (!trimmed || current.urlWhitelist.includes(trimmed)) {
+    return current
+  }
+  return updateSettings({ urlWhitelist: [...current.urlWhitelist, trimmed] })
+}
+
+/**
+ * Helper to remove a domain or rule from the whitelist.
+ */
+export function removeRuleFromWhitelist(rule: string): Settings {
+  const current = getSettings()
+  const trimmed = rule.trim()
+  const updated = current.urlWhitelist.filter((r) => r.trim() !== trimmed)
+  return updateSettings({ urlWhitelist: updated })
+}
+
+/**
+ * Check if the current page (window.location.href) is whitelisted.
+ */
+export function isCurrentPageWhitelisted(): boolean {
+  if (typeof window === 'undefined') return false
+  return isUrlAllowed(window.location.href, getSettings().urlWhitelist)
 }
 
 /**
@@ -434,52 +569,4 @@ export function getEffectiveSettings(compositeKey?: string): Settings {
     merged.heatmapColorScheme = entry.settings.heatmapColorScheme
   }
   return merged
-}
-
-// ---------------------------------------------------------------------------
-// Menu Commands
-// ---------------------------------------------------------------------------
-
-/**
- * Register Tampermonkey / Violentmonkey menu commands if available.
- * Changing settings updates state in-place without page reload.
- */
-export function initMenuCommands(): void {
-  if (typeof GM_registerMenuCommand === 'undefined') {
-    return
-  }
-
-  const settings = getSettings()
-  const autoVisLabel =
-    `Auto-Visualize (Current: ${settings.autoVisualize.toUpperCase()})`
-  const paletteLabel = `Bar Color Scheme (Current: ${settings.barColorScheme})`
-  const mapLabel =
-    `Heatmap Color Scheme (Current: ${settings.heatmapColorScheme})`
-
-  GM_registerMenuCommand(autoVisLabel, () => {
-    const current = getSettings()
-    const modes: AutoVisualizeMode[] = ['off', 'bars', 'heatmap']
-    const nextIndex = (modes.indexOf(current.autoVisualize) + 1) % modes.length
-    const nextAutoVis = modes[nextIndex]
-    updateSettings({ autoVisualize: nextAutoVis })
-    console.log(`[arXiv-Charts] Auto-visualize mode changed to ${nextAutoVis}`)
-  })
-
-  GM_registerMenuCommand(paletteLabel, () => {
-    const current = getSettings()
-    const presets = Object.keys(PRESET_PALETTES)
-    const currentIndex = presets.indexOf(current.barColorScheme)
-    const nextPalette = presets[(currentIndex + 1) % presets.length]
-    updateSettings({ barColorScheme: nextPalette })
-    console.log(`[arXiv-Charts] Bar color scheme changed to ${nextPalette}`)
-  })
-
-  GM_registerMenuCommand(mapLabel, () => {
-    const current = getSettings()
-    const maps = Object.keys(PRESET_COLORMAPS)
-    const currentIndex = maps.indexOf(current.heatmapColorScheme)
-    const nextMap = maps[(currentIndex + 1) % maps.length]
-    updateSettings({ heatmapColorScheme: nextMap })
-    console.log(`[arXiv-Charts] Heatmap color scheme changed to ${nextMap}`)
-  })
 }

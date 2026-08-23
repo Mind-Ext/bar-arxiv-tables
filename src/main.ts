@@ -7,8 +7,10 @@
 import {
   getSettings,
   getTableCompositeKey,
-  initMenuCommands,
+  isUrlAllowed,
+  matchesRule,
   onSettingsChange,
+  updateSettings,
 } from './settings'
 import {
   CandidateTable,
@@ -25,27 +27,87 @@ import { toggleSettingsPopover } from './ui/settingsPopover'
 
 console.log('[arXiv-Charts] Initializing arXiv Chart Visualizer...')
 const settings = getSettings()
-console.log('[arXiv-Charts] Current settings:', settings)
+const currentUrl = typeof window !== 'undefined' ? window.location.href : ''
+let isWhitelisted = isUrlAllowed(currentUrl, settings.urlWhitelist)
+console.log(
+  `[arXiv-Charts] Whitelist status: ${
+    isWhitelisted ? 'WHITELISTED' : 'DISABLED'
+  } (${currentUrl})`,
+)
 
-initMenuCommands()
-
-// Register ⚙️ Open Global Settings menu command if GM API available
-if (typeof GM_registerMenuCommand !== 'undefined') {
-  GM_registerMenuCommand('⚙️ Open Global Settings', () => {
-    // Create or reuse a floating anchor for the global settings popover
-    let anchor = document.getElementById(
-      'b-a-t-global-settings-anchor',
-    )
-    if (!anchor) {
-      anchor = document.createElement('div')
-      anchor.id = 'b-a-t-global-settings-anchor'
-      anchor.style.cssText =
-        'position: fixed; top: 60px; right: 20px; z-index: 10001;'
-      document.body.appendChild(anchor)
-    }
-    toggleSettingsPopover(anchor, '', () => {
+function openGlobalSettings(
+  initialTab: 'global' | 'whitelist' = 'whitelist',
+): void {
+  let anchor = document.getElementById('b-a-t-global-settings-anchor')
+  if (!anchor) {
+    anchor = document.createElement('div')
+    anchor.id = 'b-a-t-global-settings-anchor'
+    anchor.style.cssText =
+      'position: fixed; top: 60px; right: 20px; z-index: 10001;'
+    document.body.appendChild(anchor)
+  }
+  toggleSettingsPopover(
+    anchor,
+    '',
+    () => {
       updateAllVisualizations()
-    })
+    },
+    initialTab,
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Browser / Userscript Menu Commands
+// ---------------------------------------------------------------------------
+
+let whitelistMenuCommandId: number | undefined
+
+function registerWhitelistMenuCommands(): void {
+  if (
+    typeof GM_registerMenuCommand === 'undefined' ||
+    typeof window === 'undefined'
+  ) return
+
+  const currentHost = window.location.hostname || 'this site'
+
+  // Unregister previous toggle command if it exists
+  if (
+    whitelistMenuCommandId !== undefined &&
+    typeof GM_unregisterMenuCommand !== 'undefined'
+  ) {
+    GM_unregisterMenuCommand(whitelistMenuCommandId)
+  }
+
+  if (isWhitelisted) {
+    whitelistMenuCommandId = GM_registerMenuCommand(
+      `🟢 Whitelisted on ${currentHost} (Click to Disable)`,
+      () => {
+        const current = getSettings()
+        const updated = current.urlWhitelist.map((rule) =>
+          matchesRule(currentUrl, rule) ? `# ${rule}` : rule
+        )
+        updateSettings({ urlWhitelist: updated })
+      },
+    )
+  } else {
+    whitelistMenuCommandId = GM_registerMenuCommand(
+      `⚪ Enable on ${currentHost} (Click to Whitelist)`,
+      () => {
+        const current = getSettings()
+        const newRule = currentHost.includes('.')
+          ? `*://${currentHost}/*`
+          : currentHost
+        updateSettings({ urlWhitelist: [...current.urlWhitelist, newRule] })
+      },
+    )
+  }
+}
+
+registerWhitelistMenuCommands()
+
+if (typeof GM_registerMenuCommand !== 'undefined') {
+  GM_registerMenuCommand('⚙️ Open Settings', () => {
+    openGlobalSettings(isWhitelisted ? 'global' : 'whitelist')
   })
 }
 
@@ -138,27 +200,44 @@ function processPage(): void {
   }
 }
 
-// Run on page load
-processPage()
+let tableObserver: MutationObserver | null = null
+let isActivated = false
 
-// Watch for dynamically injected tables
-observeForNewTables((newCandidates) => {
-  console.log(`[arXiv-Charts] Detected ${newCandidates.length} new table(s).`)
-  injectButtons(newCandidates, handleVisualize, handleSettings)
+/** Activate table processing on the current page (idempotent). */
+function activatePage(): void {
+  if (isActivated) return
+  isActivated = true
 
-  const autoVis = getSettings().autoVisualize
-  if (autoVis !== 'off') {
-    for (const candidate of newCandidates) {
-      const compositeKey = getTableCompositeKey(candidate.id)
-      applyInlineBars(
-        candidate.parsed,
-        candidate.table,
-        autoVis,
-        compositeKey,
-      )
+  // Run on page load
+  processPage()
+
+  // Watch for dynamically injected tables
+  tableObserver = observeForNewTables((newCandidates) => {
+    console.log(`[arXiv-Charts] Detected ${newCandidates.length} new table(s).`)
+    injectButtons(newCandidates, handleVisualize, handleSettings)
+
+    const autoVis = getSettings().autoVisualize
+    if (autoVis !== 'off') {
+      for (const candidate of newCandidates) {
+        const compositeKey = getTableCompositeKey(candidate.id)
+        applyInlineBars(
+          candidate.parsed,
+          candidate.table,
+          autoVis,
+          compositeKey,
+        )
+      }
     }
-  }
-})
+  })
+}
+
+if (isWhitelisted) {
+  activatePage()
+} else {
+  console.log(
+    '[arXiv-Charts] Page URL not in whitelist. Skipping table detection.',
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Settings change handler: update active visualizations in-place
@@ -166,5 +245,20 @@ observeForNewTables((newCandidates) => {
 
 onSettingsChange((updatedSettings) => {
   console.log('[arXiv-Charts] Settings updated in-place:', updatedSettings)
+
+  // Re-evaluate whitelist status reactively
+  const wasWhitelisted = isWhitelisted
+  isWhitelisted = isUrlAllowed(currentUrl, updatedSettings.urlWhitelist)
+
+  if (isWhitelisted && !wasWhitelisted) {
+    console.log('[arXiv-Charts] Page is now whitelisted — activating.')
+    activatePage()
+  }
+
+  // Update menu command label to reflect current whitelist state
+  if (isWhitelisted !== wasWhitelisted) {
+    registerWhitelistMenuCommands()
+  }
+
   updateAllVisualizations()
 })

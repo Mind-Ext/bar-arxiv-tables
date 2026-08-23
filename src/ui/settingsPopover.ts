@@ -9,9 +9,12 @@ import {
   AutoVisualizeMode,
   clearLocalTableSettings,
   DEFAULT_SETTINGS,
+  DEFAULT_WHITELIST,
   getEffectiveSettings,
   getLocalTableSettings,
   getSettings,
+  isUrlAllowed,
+  matchesRule,
   PRESET_COLORMAPS,
   PRESET_PALETTES,
   setLocalTableSettings,
@@ -38,7 +41,7 @@ function cssOnce(): void {
   style.textContent = `
     .b-a-t-settings-popover {
       z-index: 10000;
-      width: 340px;
+      width: 360px;
       background: white;
       border: 1px solid #ccc;
       border-radius: 6px;
@@ -65,13 +68,14 @@ function cssOnce(): void {
       border-bottom: 1px solid #e9ecef;
     }
     .b-a-t-settings-tab {
-      padding: 8px 15px;
+      padding: 8px 12px;
       cursor: pointer;
       flex: 1;
       text-align: center;
       background: #f8f9fa;
       border-bottom: 2px solid transparent;
       color: #666;
+      font-size: 12px;
     }
     .b-a-t-settings-tab.active {
       background: white;
@@ -114,6 +118,25 @@ function cssOnce(): void {
       border-radius: 4px;
       box-sizing: border-box;
       font-size: 13px;
+    }
+    .b-a-t-settings-textarea {
+      width: 100%;
+      height: 120px;
+      padding: 6px 8px;
+      border: 1px solid #d1d5da;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 12px;
+      resize: vertical;
+      line-height: 1.4;
+      white-space: pre;
+    }
+    .b-a-t-help-text {
+      font-size: 11px;
+      color: #6c757d;
+      margin-top: 5px;
+      line-height: 1.35;
     }
     .b-a-t-settings-field-checkbox {
       display: flex;
@@ -244,6 +267,7 @@ export function toggleSettingsPopover(
   anchorEl: HTMLElement,
   compositeKey: string,
   onUpdate: () => void,
+  initialTab?: 'local' | 'global' | 'whitelist',
 ): void {
   // If clicking same anchor, close and return
   if (currentPopover && currentAnchor === anchorEl) {
@@ -280,6 +304,7 @@ export function toggleSettingsPopover(
 
   const barOptions = getOptionsHTML(true)
   const heatOptions = getOptionsHTML(false)
+  const defaultTab = initialTab || (compositeKey ? 'local' : 'global')
 
   const popover = document.createElement('div')
   popover.className = 'b-a-t-settings-popover'
@@ -289,11 +314,27 @@ export function toggleSettingsPopover(
       <button class="b-a-t-close-btn" data-action="close">&times;</button>
     </div>
     <div class="b-a-t-settings-tabs">
-      <div class="b-a-t-settings-tab active" data-tab="local">Current Table</div>
-      <div class="b-a-t-settings-tab" data-tab="global">Global Defaults</div>
+      ${
+    compositeKey
+      ? `<div class="b-a-t-settings-tab ${
+        defaultTab === 'local' ? 'active' : ''
+      }" data-tab="local">Current Table</div>`
+      : ''
+  }
+      <div class="b-a-t-settings-tab ${
+    defaultTab === 'global' ? 'active' : ''
+  }" data-tab="global">Visualization</div>
+      <div class="b-a-t-settings-tab ${
+    defaultTab === 'whitelist' ? 'active' : ''
+  }" data-tab="whitelist">Site Whitelist</div>
     </div>
 
-    <div class="b-a-t-settings-panel active" data-panel="local">
+    ${
+    compositeKey
+      ? `
+    <div class="b-a-t-settings-panel ${
+        defaultTab === 'local' ? 'active' : ''
+      }" data-panel="local">
       <div id="local-status-badge" class="b-a-t-settings-badge b-a-t-badge-global">Using Global Defaults</div>
 
       <div class="b-a-t-settings-field">
@@ -317,8 +358,13 @@ export function toggleSettingsPopover(
         <button class="b-a-t-btn b-a-t-btn-primary" data-action="apply">Save for Table</button>
       </div>
     </div>
+    `
+      : ''
+  }
 
-    <div class="b-a-t-settings-panel" data-panel="global">
+    <div class="b-a-t-settings-panel ${
+    defaultTab === 'global' ? 'active' : ''
+  }" data-panel="global">
       <div class="b-a-t-settings-group">
         <div class="b-a-t-settings-group-title">Render Settings</div>
 
@@ -375,6 +421,34 @@ export function toggleSettingsPopover(
       <div class="b-a-t-settings-footer">
         <button class="b-a-t-btn" data-action="reset-global">Reset to Defaults</button>
         <button class="b-a-t-btn b-a-t-btn-primary" data-action="save-global">Save Global</button>
+      </div>
+    </div>
+
+    <div class="b-a-t-settings-panel ${
+    defaultTab === 'whitelist' ? 'active' : ''
+  }" data-panel="whitelist">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <span style="font-weight: 500; font-size: 12px;">Current Site Status:</span>
+        <span id="whitelist-status-badge" class="b-a-t-settings-badge b-a-t-badge-global">Checking...</span>
+      </div>
+
+      <div style="margin-bottom: 10px;">
+        <button type="button" class="b-a-t-btn" data-action="toggle-current-domain" style="width: 100%; text-align: center;">
+          ➕ Whitelist Current Domain
+        </button>
+      </div>
+
+      <div class="b-a-t-settings-field">
+        <label>Allowed URL Rules (one per line):</label>
+        <textarea name="urlWhitelist" class="b-a-t-settings-textarea" placeholder="*://arxiv.org/html/*&#10;*://ar5iv.labs.arxiv.org/html/*&#10;file:///*.html&#10;biorxiv.org&#10;/\/papers\/\d+/"></textarea>
+        <div class="b-a-t-help-text">
+          Supports domain names (<code>biorxiv.org</code>), wildcards (<code>*arxiv.org/html/*</code>, <code>file:///*.html</code>), or <code>/regex/</code>. Lines starting with <code>#</code> are comments.
+        </div>
+      </div>
+
+      <div class="b-a-t-settings-footer">
+        <button class="b-a-t-btn" data-action="reset-whitelist">Reset Whitelist</button>
+        <button class="b-a-t-btn b-a-t-btn-primary" data-action="save-whitelist">Save Whitelist</button>
       </div>
     </div>
   `
@@ -436,9 +510,12 @@ export function toggleSettingsPopover(
   })
 
   // --- Element references ---
+  // Note: Local controls are typed as T | null because the Local panel is
+  // conditionally rendered only when a table composite key is present.
+  // Global and Whitelist controls are always rendered into the DOM.
 
   const q = <T extends HTMLElement>(selector: string) =>
-    popover.querySelector(selector) as T
+    popover.querySelector(selector) as T | null
   const qa = <T extends HTMLElement>(selector: string) =>
     popover.querySelectorAll(selector) as NodeListOf<T>
 
@@ -446,7 +523,11 @@ export function toggleSettingsPopover(
     tabs: qa('[data-tab]'),
     panels: qa('[data-panel]'),
     localStatus: q('#local-status-badge'),
-    opacityVal: q('#opacity-val'),
+    whitelistStatus: q('#whitelist-status-badge'),
+    toggleDomainBtn: q<HTMLButtonElement>(
+      '[data-action="toggle-current-domain"]',
+    ),
+    whitelistTextarea: q<HTMLTextAreaElement>('textarea[name="urlWhitelist"]'),
 
     localBarSel: q<HTMLSelectElement>('[name="local-barColorScheme"]'),
     localBarInput: q<HTMLInputElement>(
@@ -457,29 +538,30 @@ export function toggleSettingsPopover(
       '[data-custom-input="local-heatmapColorScheme"]',
     ),
 
-    globalAutoVis: q<HTMLSelectElement>('[name="autoVisualize"]'),
-    globalBarSel: q<HTMLSelectElement>('[name="barColorScheme"]'),
+    globalAutoVis: q<HTMLSelectElement>('[name="autoVisualize"]')!,
+    globalBarSel: q<HTMLSelectElement>('[name="barColorScheme"]')!,
     globalBarInput: q<HTMLInputElement>(
       '[data-custom-input="barColorScheme"]',
-    ),
-    globalHeatSel: q<HTMLSelectElement>('[name="heatmapColorScheme"]'),
+    )!,
+    globalHeatSel: q<HTMLSelectElement>('[name="heatmapColorScheme"]')!,
     globalHeatInput: q<HTMLInputElement>(
       '[data-custom-input="heatmapColorScheme"]',
-    ),
-    globalChartOpacity: q<HTMLInputElement>('[name="chartOpacity"]'),
-    globalButtonOpacity: q<HTMLInputElement>('[name="buttonOpacity"]'),
-    globalIncInt: q<HTMLInputElement>('[name="includeAllIntegerColumns"]'),
-    globalIncSci: q<HTMLInputElement>('[name="includeScientificNotation"]'),
+    )!,
+    globalChartOpacity: q<HTMLInputElement>('[name="chartOpacity"]')!,
+    globalButtonOpacity: q<HTMLInputElement>('[name="buttonOpacity"]')!,
+    globalIncInt: q<HTMLInputElement>('[name="includeAllIntegerColumns"]')!,
+    globalIncSci: q<HTMLInputElement>('[name="includeScientificNotation"]')!,
   }
 
   // --- Helpers ---
 
   /** Populate a select + custom-input pair from a setting value. */
   const setSchemeField = (
-    sel: HTMLSelectElement,
-    input: HTMLInputElement,
+    sel: HTMLSelectElement | null,
+    input: HTMLInputElement | null,
     val: string,
   ): void => {
+    if (!sel || !input) return
     let found = false
     for (let i = 0; i < sel.options.length; i++) {
       if (sel.options[i].value === val) {
@@ -499,14 +581,16 @@ export function toggleSettingsPopover(
 
   /** Read value from a select + custom-input pair. */
   const getSchemeField = (
-    sel: HTMLSelectElement,
-    input: HTMLInputElement,
+    sel: HTMLSelectElement | null,
+    input: HTMLInputElement | null,
   ): string => {
+    if (!sel || !input) return ''
     return sel.value === 'custom' ? input.value : sel.value
   }
 
-  /** Update status badge live based on current form controls. */
-  const updateBadge = (): void => {
+  /** Update local status badge live based on current form controls. */
+  const updateLocalBadge = (): void => {
+    if (!els.localStatus || !els.localBarSel || !els.localBarInput) return
     const globalSettings = getSettings()
     const bar = getSchemeField(els.localBarSel, els.localBarInput)
     const heat = getSchemeField(els.localHeatSel, els.localHeatInput)
@@ -526,16 +610,41 @@ export function toggleSettingsPopover(
     }
   }
 
+  /** Update whitelist status badge and toggle domain button. */
+  const updateWhitelistBadge = (): void => {
+    if (!els.whitelistStatus || !els.whitelistTextarea) return
+    const currentUrl = typeof window !== 'undefined' ? window.location.href : ''
+    const currentHost =
+      (typeof window !== 'undefined' && window.location.hostname) || 'this page'
+    const rules = els.whitelistTextarea.value.split('\n')
+    const allowed = isUrlAllowed(currentUrl, rules)
+
+    if (allowed) {
+      els.whitelistStatus.textContent = '🟢 Whitelisted'
+      els.whitelistStatus.className = 'b-a-t-settings-badge b-a-t-badge-custom'
+      if (els.toggleDomainBtn) {
+        els.toggleDomainBtn.textContent =
+          `➖ Remove ${currentHost} from Whitelist`
+      }
+    } else {
+      els.whitelistStatus.textContent = '⚪ Not Whitelisted'
+      els.whitelistStatus.className = 'b-a-t-settings-badge b-a-t-badge-global'
+      if (els.toggleDomainBtn) {
+        els.toggleDomainBtn.textContent = `➕ Whitelist ${currentHost}`
+      }
+    }
+  }
+
   /** Live preview updates for Local tab. */
   const triggerLivePreviewLocal = (): void => {
-    if (!compositeKey) return
+    if (!compositeKey || !els.localBarSel || !els.localBarInput) return
     const bar = getSchemeField(els.localBarSel, els.localBarInput)
     const heat = getSchemeField(els.localHeatSel, els.localHeatInput)
     setLocalTableSettings(compositeKey, {
       barColorScheme: bar,
       heatmapColorScheme: heat,
     })
-    updateBadge()
+    updateLocalBadge()
     onUpdate()
   }
 
@@ -556,7 +665,7 @@ export function toggleSettingsPopover(
       includeScientificNotation: els.globalIncSci.checked,
     }
     updateSettings(draftGlobal)
-    updateBadge()
+    updateLocalBadge()
     onUpdate()
   }
 
@@ -566,12 +675,19 @@ export function toggleSettingsPopover(
     const effective = getEffectiveSettings(compositeKey)
 
     // Local tab fields
-    setSchemeField(els.localBarSel, els.localBarInput, effective.barColorScheme)
-    setSchemeField(
-      els.localHeatSel,
-      els.localHeatInput,
-      effective.heatmapColorScheme,
-    )
+    if (compositeKey) {
+      setSchemeField(
+        els.localBarSel,
+        els.localBarInput,
+        effective.barColorScheme,
+      )
+      setSchemeField(
+        els.localHeatSel,
+        els.localHeatInput,
+        effective.heatmapColorScheme,
+      )
+      updateLocalBadge()
+    }
 
     // Global tab fields
     els.globalAutoVis.value = globalSettings.autoVisualize
@@ -590,7 +706,13 @@ export function toggleSettingsPopover(
     els.globalIncInt.checked = globalSettings.includeAllIntegerColumns
     els.globalIncSci.checked = globalSettings.includeScientificNotation
 
-    updateBadge()
+    // Whitelist tab fields
+    if (els.whitelistTextarea) {
+      els.whitelistTextarea.value = (
+        globalSettings.urlWhitelist ?? DEFAULT_WHITELIST
+      ).join('\n')
+      updateWhitelistBadge()
+    }
   }
 
   // --- Initialize ---
@@ -599,13 +721,15 @@ export function toggleSettingsPopover(
   // --- Live preview event listeners ---
 
   // Local tab input changes
-  const handleLocalChange = () => {
-    triggerLivePreviewLocal()
+  if (els.localBarSel && els.localHeatSel) {
+    const handleLocalChange = () => {
+      triggerLivePreviewLocal()
+    }
+    els.localBarSel.addEventListener('change', handleLocalChange)
+    els.localBarInput?.addEventListener('input', handleLocalChange)
+    els.localHeatSel.addEventListener('change', handleLocalChange)
+    els.localHeatInput?.addEventListener('input', handleLocalChange)
   }
-  els.localBarSel.addEventListener('change', handleLocalChange)
-  els.localBarInput.addEventListener('input', handleLocalChange)
-  els.localHeatSel.addEventListener('change', handleLocalChange)
-  els.localHeatInput.addEventListener('input', handleLocalChange)
 
   // Global tab input changes
   const handleGlobalChange = () => {
@@ -622,6 +746,13 @@ export function toggleSettingsPopover(
   els.globalButtonOpacity.addEventListener('change', handleGlobalChange)
   els.globalIncInt.addEventListener('change', handleGlobalChange)
   els.globalIncSci.addEventListener('change', handleGlobalChange)
+
+  // Whitelist textarea live change
+  if (els.whitelistTextarea) {
+    els.whitelistTextarea.addEventListener('input', () => {
+      updateWhitelistBadge()
+    })
+  }
 
   // Show/hide custom text input on select change
   qa('select').forEach((sel) => {
@@ -656,7 +787,7 @@ export function toggleSettingsPopover(
       return
     }
 
-    // Footer actions
+    // Footer & other actions
     const action = target.closest('[data-action]')?.getAttribute('data-action')
     if (!action) return
 
@@ -717,6 +848,55 @@ export function toggleSettingsPopover(
         updateSettings(DEFAULT_SETTINGS)
         populateFields()
         onUpdate()
+        break
+      }
+
+      case 'toggle-current-domain': {
+        if (!els.whitelistTextarea) break
+        const currentUrl = typeof window !== 'undefined'
+          ? window.location.href
+          : ''
+        const currentHost =
+          (typeof window !== 'undefined' && window.location.hostname) || ''
+        const lines = els.whitelistTextarea.value.split('\n')
+        const allowed = isUrlAllowed(currentUrl, lines)
+        if (allowed) {
+          // Comment out rules that match the current URL
+          const commented = lines.map((l) =>
+            matchesRule(currentUrl, l) ? `# ${l}` : l
+          )
+          els.whitelistTextarea.value = commented.join('\n')
+        } else {
+          // Add current domain rule
+          const newRule = currentHost
+            ? (currentHost.includes('.') ? `*://${currentHost}/*` : currentHost)
+            : currentUrl
+          const val = els.whitelistTextarea.value.trim()
+          els.whitelistTextarea.value = val ? `${val}\n${newRule}` : newRule
+        }
+        updateWhitelistBadge()
+        break
+      }
+
+      case 'reset-whitelist': {
+        if (els.whitelistTextarea) {
+          els.whitelistTextarea.value = DEFAULT_WHITELIST.join('\n')
+          updateWhitelistBadge()
+        }
+        break
+      }
+
+      case 'save-whitelist': {
+        if (els.whitelistTextarea) {
+          const rules = els.whitelistTextarea.value
+            .split('\n')
+            .map((s) => s.trim())
+            .filter(Boolean)
+          updateSettings({ urlWhitelist: rules })
+          isSaved = true
+          onUpdate()
+          closePopover()
+        }
         break
       }
     }

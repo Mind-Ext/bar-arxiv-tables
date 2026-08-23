@@ -1,15 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   _resetStorageForTesting,
+  addRuleToWhitelist,
   clearLocalTableSettings,
   DEFAULT_SETTINGS,
+  DEFAULT_WHITELIST,
   getEffectiveSettings,
   getLocalTableSettings,
   getSettings,
   getTableCompositeKey,
+  isCurrentPageWhitelisted,
+  isUrlAllowed,
   LOCAL_SETTINGS_CAP,
+  matchesRule,
   onSettingsChange,
   PRESET_PALETTES,
+  removeRuleFromWhitelist,
   resolvePaletteColors,
   setLocalTableSettings,
   updateSettings,
@@ -45,6 +51,7 @@ describe('Settings Management', () => {
       heatmapColorScheme: 'Cividis',
       includeAllIntegerColumns: false,
       includeScientificNotation: false,
+      urlWhitelist: DEFAULT_WHITELIST,
     })
 
     unsubscribe()
@@ -217,5 +224,207 @@ describe('Effective Settings', () => {
 
     const eff = getEffectiveSettings('paper#table-1')
     expect(eff.barColorScheme).toBe('Set1')
+  })
+})
+
+describe('URL Whitelist & Scope Matching', () => {
+  describe('matchesRule', () => {
+    it('matches bare domain substring', () => {
+      expect(
+        matchesRule(
+          'https://www.biorxiv.org/content/10.1101/2024.01.01',
+          'biorxiv.org',
+        ),
+      ).toBe(true)
+      expect(
+        matchesRule(
+          'https://arxiv.org/html/2401.12345',
+          'biorxiv.org',
+        ),
+      ).toBe(false)
+    })
+
+    it('matches path snippets', () => {
+      expect(
+        matchesRule(
+          'https://arxiv.org/html/2401.12345',
+          'arxiv.org/html/',
+        ),
+      ).toBe(true)
+      expect(
+        matchesRule(
+          'https://arxiv.org/abs/2401.12345',
+          'arxiv.org/html/',
+        ),
+      ).toBe(false)
+    })
+
+    it('matches standard WebExtension/Userscript glob patterns', () => {
+      expect(
+        matchesRule(
+          'https://arxiv.org/html/2401.12345',
+          '*://arxiv.org/html/*',
+        ),
+      ).toBe(true)
+      expect(
+        matchesRule(
+          'https://arxiv.org/abs/2401.12345',
+          '*://arxiv.org/html/*',
+        ),
+      ).toBe(false)
+    })
+
+    it('matches local file patterns', () => {
+      expect(
+        matchesRule(
+          'file:///home/user/paper.html',
+          'file:///*.html',
+        ),
+      ).toBe(true)
+      expect(
+        matchesRule(
+          'file:///home/user/paper.pdf',
+          'file:///*.html',
+        ),
+      ).toBe(false)
+    })
+
+    it('matches subdomain wildcard patterns', () => {
+      expect(
+        matchesRule(
+          'https://forum.openreview.net/forum?id=123',
+          '*.openreview.net/forum',
+        ),
+      ).toBe(true)
+    })
+
+    it('matches raw regex patterns wrapped in /.../', () => {
+      expect(
+        matchesRule(
+          'https://arxiv.org/html/2401.12345v2',
+          '/\\/html\\/\\d{4}\\.\\d{4,5}(v\\d+)?$/',
+        ),
+      ).toBe(true)
+      expect(
+        matchesRule(
+          'https://arxiv.org/pdf/2401.12345.pdf',
+          '/\\/html\\/\\d{4}\\.\\d{4,5}(v\\d+)?$/',
+        ),
+      ).toBe(false)
+    })
+
+    it('supports regex flags', () => {
+      expect(
+        matchesRule(
+          'https://arxiv.org/html/2401.12345',
+          '/ARXIV\\.ORG\\/HTML\\//i',
+        ),
+      ).toBe(true)
+    })
+
+    it('ignores comments and empty lines', () => {
+      expect(matchesRule('https://arxiv.org/html/123', '# a comment')).toBe(
+        false,
+      )
+      expect(matchesRule('https://arxiv.org/html/123', '   ')).toBe(false)
+      expect(matchesRule('https://arxiv.org/html/123', '')).toBe(false)
+    })
+    it('does not match query strings, spoofed domain prefixes, or attacker subdomains', () => {
+      expect(
+        matchesRule(
+          'https://evil.com/?q=biorxiv.org',
+          'biorxiv.org',
+        ),
+      ).toBe(false)
+      expect(
+        matchesRule(
+          'https://notbiorxiv.org/content/123',
+          'biorxiv.org',
+        ),
+      ).toBe(false)
+      expect(
+        matchesRule(
+          'https://biorxiv.org.attacker.com/page',
+          'biorxiv.org',
+        ),
+      ).toBe(false)
+    })
+
+    it('matches subdomains and custom ports for domain rules', () => {
+      expect(
+        matchesRule(
+          'https://sub.biorxiv.org/content/123',
+          'biorxiv.org',
+        ),
+      ).toBe(true)
+      expect(
+        matchesRule(
+          'http://biorxiv.org:8080/content/123',
+          'biorxiv.org',
+        ),
+      ).toBe(true)
+    })
+
+    it('safely handles invalid regex patterns without throwing', () => {
+      expect(
+        matchesRule(
+          'https://arxiv.org/html/123',
+          '/[unclosed-bracket/',
+        ),
+      ).toBe(false)
+    })
+  })
+
+  describe('isUrlAllowed', () => {
+    it('returns true if any whitelist rule matches', () => {
+      const whitelist = [
+        'biorxiv.org',
+        '*://arxiv.org/html/*',
+        'file:///*.html',
+      ]
+      expect(isUrlAllowed('https://arxiv.org/html/2401.12345', whitelist)).toBe(
+        true,
+      )
+      expect(
+        isUrlAllowed('https://biorxiv.org/content/123', whitelist),
+      ).toBe(true)
+      expect(isUrlAllowed('file:///test.html', whitelist)).toBe(true)
+      expect(isUrlAllowed('https://google.com', whitelist)).toBe(false)
+    })
+  })
+
+  describe('Whitelist storage helpers', () => {
+    beforeEach(() => {
+      _resetStorageForTesting()
+    })
+
+    it('adds new rules to whitelist avoiding duplicates', () => {
+      addRuleToWhitelist('biorxiv.org')
+      expect(getSettings().urlWhitelist).toContain('biorxiv.org')
+
+      // Adding duplicate should not duplicate entry
+      const count =
+        getSettings().urlWhitelist.filter((r) => r === 'biorxiv.org').length
+      expect(count).toBe(1)
+      addRuleToWhitelist('biorxiv.org')
+      expect(
+        getSettings().urlWhitelist.filter((r) => r === 'biorxiv.org').length,
+      ).toBe(1)
+    })
+
+    it('removes rules from whitelist', () => {
+      addRuleToWhitelist('biorxiv.org')
+      expect(getSettings().urlWhitelist).toContain('biorxiv.org')
+
+      removeRuleFromWhitelist('biorxiv.org')
+      expect(getSettings().urlWhitelist).not.toContain('biorxiv.org')
+    })
+
+    it('checks if current page is whitelisted via isCurrentPageWhitelisted', () => {
+      // In jsdom environment, location is http://localhost:3000/ or about:blank
+      expect(isCurrentPageWhitelisted()).toBe(false)
+      addRuleToWhitelist('localhost')
+      expect(isCurrentPageWhitelisted()).toBe(true)
+    })
   })
 })

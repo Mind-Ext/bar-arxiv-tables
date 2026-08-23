@@ -11,14 +11,14 @@ export default defineConfig({
         version: '0.1.0',
         description: 'Visualize numerical tables on arXiv HTML papers with bar charts and other styles.',
         match: [
-          '*://arxiv.org/html/*',
-          '*://ar5iv.labs.arxiv.org/html/*',
-          'file:///*.html',
+          '*://*/*',
+          'file:///*',
         ],
         grant: [
           'GM_getValue',
           'GM_setValue',
           'GM_registerMenuCommand',
+          'GM_unregisterMenuCommand',
         ],
         updateURL: 'https://github.com/Mind-Ext/bar-arxiv-tables/raw/main/dist/bar-arxiv-tables.user.js',
         downloadURL: 'https://github.com/Mind-Ext/bar-arxiv-tables/raw/main/dist/bar-arxiv-tables.user.js',
