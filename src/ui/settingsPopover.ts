@@ -16,7 +16,9 @@ import {
   isUrlAllowed,
   matchesRule,
   PRESET_COLORMAPS,
+  PRESET_DIVERGING_COLORMAPS,
   PRESET_PALETTES,
+  PRESET_SEQUENTIAL_COLORMAPS,
   setLocalTableSettings,
   Settings,
   updateSettings,
@@ -215,22 +217,36 @@ function cssOnce(): void {
 
 /**
  * Build <option> HTML for a color scheme dropdown.
- * @param includePalettes - Whether to include categorical palette presets.
+ * @param category - Palette/all colormaps, sequential colormaps, or diverging colormaps.
  */
-function getOptionsHTML(includePalettes: boolean): string {
+function getOptionsHTML(
+  category: 'palette' | 'sequential' | 'diverging',
+): string {
   const options: string[] = []
-  if (includePalettes) {
+  if (category === 'palette') {
     options.push('<optgroup label="Palettes">')
     for (const key of Object.keys(PRESET_PALETTES)) {
       options.push(`<option value="${key}">${key}</option>`)
     }
     options.push('</optgroup>')
+    options.push('<optgroup label="Colormaps">')
+    for (const key of Object.keys(PRESET_COLORMAPS)) {
+      options.push(`<option value="${key}">${key}</option>`)
+    }
+    options.push('</optgroup>')
+  } else if (category === 'sequential') {
+    options.push('<optgroup label="Sequential">')
+    for (const key of Object.keys(PRESET_SEQUENTIAL_COLORMAPS)) {
+      options.push(`<option value="${key}">${key}</option>`)
+    }
+    options.push('</optgroup>')
+  } else if (category === 'diverging') {
+    options.push('<optgroup label="Diverging">')
+    for (const key of Object.keys(PRESET_DIVERGING_COLORMAPS)) {
+      options.push(`<option value="${key}">${key}</option>`)
+    }
+    options.push('</optgroup>')
   }
-  options.push('<optgroup label="Colormaps">')
-  for (const key of Object.keys(PRESET_COLORMAPS)) {
-    options.push(`<option value="${key}">${key}</option>`)
-  }
-  options.push('</optgroup>')
   options.push('<option value="custom">Custom...</option>')
   return options.join('')
 }
@@ -302,8 +318,9 @@ export function toggleSettingsPopover(
     }
   }
 
-  const barOptions = getOptionsHTML(true)
-  const heatOptions = getOptionsHTML(false)
+  const barOptions = getOptionsHTML('palette')
+  const heatSeqOptions = getOptionsHTML('sequential')
+  const heatDivOptions = getOptionsHTML('diverging')
   const defaultTab = initialTab || (compositeKey ? 'local' : 'global')
 
   const popover = document.createElement('div')
@@ -346,11 +363,19 @@ export function toggleSettingsPopover(
       </div>
 
       <div class="b-a-t-settings-field">
-        <label>Heatmap Color Scheme</label>
+        <label>Heatmap Color Scheme (Sequential)</label>
         <select name="local-heatmapColorScheme">
-          ${heatOptions}
+          ${heatSeqOptions}
         </select>
         <input type="text" class="b-a-t-settings-custom-input" data-custom-input="local-heatmapColorScheme" placeholder="#ff5733, #33ff57">
+      </div>
+
+      <div class="b-a-t-settings-field">
+        <label>Heatmap Color Scheme (Diverging)</label>
+        <select name="local-divergingColorScheme">
+          ${heatDivOptions}
+        </select>
+        <input type="text" class="b-a-t-settings-custom-input" data-custom-input="local-divergingColorScheme" placeholder="#ff5733, #33ff57">
       </div>
 
       <div class="b-a-t-settings-footer">
@@ -386,11 +411,19 @@ export function toggleSettingsPopover(
         </div>
 
         <div class="b-a-t-settings-field">
-          <label>Heatmap Color Scheme</label>
+          <label>Heatmap Color Scheme (Sequential)</label>
           <select name="heatmapColorScheme">
-            ${heatOptions}
+            ${heatSeqOptions}
           </select>
           <input type="text" class="b-a-t-settings-custom-input" data-custom-input="heatmapColorScheme" placeholder="#ff5733, #33ff57">
+        </div>
+
+        <div class="b-a-t-settings-field">
+          <label>Heatmap Color Scheme (Diverging)</label>
+          <select name="divergingColorScheme">
+            ${heatDivOptions}
+          </select>
+          <input type="text" class="b-a-t-settings-custom-input" data-custom-input="divergingColorScheme" placeholder="#ff5733, #33ff57">
         </div>
 
         <div class="b-a-t-settings-field">
@@ -537,6 +570,10 @@ export function toggleSettingsPopover(
     localHeatInput: q<HTMLInputElement>(
       '[data-custom-input="local-heatmapColorScheme"]',
     ),
+    localDivSel: q<HTMLSelectElement>('[name="local-divergingColorScheme"]'),
+    localDivInput: q<HTMLInputElement>(
+      '[data-custom-input="local-divergingColorScheme"]',
+    ),
 
     globalAutoVis: q<HTMLSelectElement>('[name="autoVisualize"]')!,
     globalBarSel: q<HTMLSelectElement>('[name="barColorScheme"]')!,
@@ -546,6 +583,10 @@ export function toggleSettingsPopover(
     globalHeatSel: q<HTMLSelectElement>('[name="heatmapColorScheme"]')!,
     globalHeatInput: q<HTMLInputElement>(
       '[data-custom-input="heatmapColorScheme"]',
+    )!,
+    globalDivSel: q<HTMLSelectElement>('[name="divergingColorScheme"]')!,
+    globalDivInput: q<HTMLInputElement>(
+      '[data-custom-input="divergingColorScheme"]',
     )!,
     globalChartOpacity: q<HTMLInputElement>('[name="chartOpacity"]')!,
     globalButtonOpacity: q<HTMLInputElement>('[name="buttonOpacity"]')!,
@@ -594,11 +635,13 @@ export function toggleSettingsPopover(
     const globalSettings = getSettings()
     const bar = getSchemeField(els.localBarSel, els.localBarInput)
     const heat = getSchemeField(els.localHeatSel, els.localHeatInput)
+    const div = getSchemeField(els.localDivSel, els.localDivInput)
 
     const isCustom = Boolean(
       (compositeKey && getLocalTableSettings(compositeKey)) ||
         bar !== globalSettings.barColorScheme ||
-        heat !== globalSettings.heatmapColorScheme,
+        heat !== globalSettings.heatmapColorScheme ||
+        div !== globalSettings.divergingColorScheme,
     )
 
     if (isCustom) {
@@ -640,9 +683,11 @@ export function toggleSettingsPopover(
     if (!compositeKey || !els.localBarSel || !els.localBarInput) return
     const bar = getSchemeField(els.localBarSel, els.localBarInput)
     const heat = getSchemeField(els.localHeatSel, els.localHeatInput)
+    const div = getSchemeField(els.localDivSel, els.localDivInput)
     setLocalTableSettings(compositeKey, {
       barColorScheme: bar,
       heatmapColorScheme: heat,
+      divergingColorScheme: div,
     })
     updateLocalBadge()
     onUpdate()
@@ -658,6 +703,10 @@ export function toggleSettingsPopover(
       heatmapColorScheme: getSchemeField(
         els.globalHeatSel,
         els.globalHeatInput,
+      ),
+      divergingColorScheme: getSchemeField(
+        els.globalDivSel,
+        els.globalDivInput,
       ),
       chartOpacity: isNaN(chartOp) ? DEFAULT_SETTINGS.chartOpacity : chartOp,
       buttonOpacity: isNaN(btnOp) ? DEFAULT_SETTINGS.buttonOpacity : btnOp,
@@ -686,6 +735,11 @@ export function toggleSettingsPopover(
         els.localHeatInput,
         effective.heatmapColorScheme,
       )
+      setSchemeField(
+        els.localDivSel,
+        els.localDivInput,
+        effective.divergingColorScheme,
+      )
       updateLocalBadge()
     }
 
@@ -700,6 +754,11 @@ export function toggleSettingsPopover(
       els.globalHeatSel,
       els.globalHeatInput,
       globalSettings.heatmapColorScheme,
+    )
+    setSchemeField(
+      els.globalDivSel,
+      els.globalDivInput,
+      globalSettings.divergingColorScheme,
     )
     els.globalChartOpacity.value = globalSettings.chartOpacity.toString()
     els.globalButtonOpacity.value = globalSettings.buttonOpacity.toString()
@@ -729,6 +788,8 @@ export function toggleSettingsPopover(
     els.localBarInput?.addEventListener('input', handleLocalChange)
     els.localHeatSel.addEventListener('change', handleLocalChange)
     els.localHeatInput?.addEventListener('input', handleLocalChange)
+    els.localDivSel?.addEventListener('change', handleLocalChange)
+    els.localDivInput?.addEventListener('input', handleLocalChange)
   }
 
   // Global tab input changes
@@ -740,6 +801,8 @@ export function toggleSettingsPopover(
   els.globalBarInput.addEventListener('input', handleGlobalChange)
   els.globalHeatSel.addEventListener('change', handleGlobalChange)
   els.globalHeatInput.addEventListener('input', handleGlobalChange)
+  els.globalDivSel.addEventListener('change', handleGlobalChange)
+  els.globalDivInput.addEventListener('input', handleGlobalChange)
   els.globalChartOpacity.addEventListener('input', handleGlobalChange)
   els.globalChartOpacity.addEventListener('change', handleGlobalChange)
   els.globalButtonOpacity.addEventListener('input', handleGlobalChange)
@@ -799,10 +862,12 @@ export function toggleSettingsPopover(
       case 'apply': {
         const bar = getSchemeField(els.localBarSel, els.localBarInput)
         const heat = getSchemeField(els.localHeatSel, els.localHeatInput)
+        const div = getSchemeField(els.localDivSel, els.localDivInput)
         if (compositeKey) {
           setLocalTableSettings(compositeKey, {
             barColorScheme: bar,
             heatmapColorScheme: heat,
+            divergingColorScheme: div,
           })
         }
         isSaved = true
@@ -829,6 +894,10 @@ export function toggleSettingsPopover(
           heatmapColorScheme: getSchemeField(
             els.globalHeatSel,
             els.globalHeatInput,
+          ),
+          divergingColorScheme: getSchemeField(
+            els.globalDivSel,
+            els.globalDivInput,
           ),
           chartOpacity: isNaN(chartOp)
             ? DEFAULT_SETTINGS.chartOpacity

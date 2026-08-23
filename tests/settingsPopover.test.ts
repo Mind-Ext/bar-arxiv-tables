@@ -206,29 +206,63 @@ describe('Settings Popover UI', () => {
       toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
       const barSel = getSelect('local-barColorScheme')
       const heatSel = getSelect('local-heatmapColorScheme')
+      const divSel = getSelect('local-divergingColorScheme')
 
       expect(barSel.value).toBe(DEFAULT_SETTINGS.barColorScheme)
       expect(heatSel.value).toBe(DEFAULT_SETTINGS.heatmapColorScheme)
+      expect(divSel.value).toBe(DEFAULT_SETTINGS.divergingColorScheme)
     })
 
     it('populates local tab with local overrides when present', () => {
-      setLocalTableSettings('paper#t1', { barColorScheme: 'Set1' })
+      setLocalTableSettings('paper#t1', {
+        barColorScheme: 'Set1',
+        divergingColorScheme: 'RdBu',
+      })
       toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
       const barSel = getSelect('local-barColorScheme')
+      const divSel = getSelect('local-divergingColorScheme')
 
       expect(barSel.value).toBe('Set1')
+      expect(divSel.value).toBe('RdBu')
     })
 
     it('populates global tab with current global settings', () => {
-      updateSettings({ autoVisualize: 'bars', barColorScheme: 'tab10' })
+      updateSettings({
+        autoVisualize: 'bars',
+        barColorScheme: 'tab10',
+        divergingColorScheme: 'Spectral',
+      })
       toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
       clickTab('global')
 
       const autoVis = getSelect('autoVisualize')
       const barSel = getSelect('barColorScheme')
+      const divSel = getSelect('divergingColorScheme')
 
       expect(autoVis.value).toBe('bars')
       expect(barSel.value).toBe('tab10')
+      expect(divSel.value).toBe('Spectral')
+    })
+
+    it('filters dropdown presets by sequential vs diverging category', () => {
+      toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
+      const heatSel = getSelect('local-heatmapColorScheme')
+      const divSel = getSelect('local-divergingColorScheme')
+
+      const heatOptions = Array.from(heatSel.options).map((o) => o.value)
+      const divOptions = Array.from(divSel.options).map((o) => o.value)
+
+      // Sequential dropdown has Cividis and Viridis, not PuOr or RdBu
+      expect(heatOptions).toContain('Cividis')
+      expect(heatOptions).toContain('Viridis')
+      expect(heatOptions).not.toContain('PuOr')
+      expect(heatOptions).not.toContain('RdBu')
+
+      // Diverging dropdown has PuOr and RdBu, not Cividis or Viridis
+      expect(divOptions).toContain('PuOr')
+      expect(divOptions).toContain('RdBu')
+      expect(divOptions).not.toContain('Cividis')
+      expect(divOptions).not.toContain('Viridis')
     })
 
     it('shows custom input when value is not a known preset', () => {

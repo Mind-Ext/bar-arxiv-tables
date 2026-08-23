@@ -49,6 +49,7 @@ describe('Settings Management', () => {
       chartOpacity: 0.35,
       barColorScheme: 'Pastel1',
       heatmapColorScheme: 'Cividis',
+      divergingColorScheme: 'PuOr',
       includeAllIntegerColumns: false,
       includeScientificNotation: false,
       urlWhitelist: DEFAULT_WHITELIST,
@@ -198,18 +199,21 @@ describe('Effective Settings', () => {
     expect(eff.barColorScheme).toBe('Set1')
     // Other fields should remain global defaults
     expect(eff.heatmapColorScheme).toBe('Cividis')
+    expect(eff.divergingColorScheme).toBe('PuOr')
     expect(eff.autoVisualize).toBe('off')
   })
 
-  it('merges both local override fields when present', () => {
+  it('merges all local override fields when present', () => {
     setLocalTableSettings('paper#table-1', {
       barColorScheme: 'Set1',
       heatmapColorScheme: 'Plasma',
+      divergingColorScheme: 'RdBu',
     })
 
     const eff = getEffectiveSettings('paper#table-1')
     expect(eff.barColorScheme).toBe('Set1')
     expect(eff.heatmapColorScheme).toBe('Plasma')
+    expect(eff.divergingColorScheme).toBe('RdBu')
   })
 
   it('reflects global settings changes in effective settings', () => {

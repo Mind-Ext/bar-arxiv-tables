@@ -168,6 +168,9 @@ export function applyInlineBars(
     : null
   const paletteCycle = resolvePaletteCycle(settings.barColorScheme)
   const colormapCycle = resolveColormapCycle(settings.heatmapColorScheme)
+  const divergingColormapCycle = resolveColormapCycle(
+    settings.divergingColorScheme || 'PuOr',
+  )
 
   // Precompute per-column colors cycled from the active palette cycle for bars mode
   const columnBarColors: BarColors[] = []
@@ -202,10 +205,23 @@ export function applyInlineBars(
 
       if (activeMode === 'heatmap') {
         const { min, max } = stats[c]
-        const norm = min === max
-          ? 0.5
-          : Math.max(0, Math.min(1, (cv.value - min) / (max - min)))
-        const interpolator = colormapCycle[c % colormapCycle.length]
+        let norm: number
+        let interpolator: (t: number) => string
+
+        if (min < 0 && max > 0) {
+          // Bipolar column (mixed positive and negative values):
+          // Map zero to 0.5 with symmetric scaling [-absMax, absMax]
+          const absMax = Math.max(Math.abs(min), Math.abs(max))
+          norm = absMax === 0 ? 0.5 : 0.5 + (cv.value / absMax) * 0.5
+          interpolator =
+            divergingColormapCycle[c % divergingColormapCycle.length]
+        } else {
+          // Unipolar column (all non-negative or all non-positive):
+          norm = min === max ? 0.5 : (cv.value - min) / (max - min)
+          interpolator = colormapCycle[c % colormapCycle.length]
+        }
+
+        norm = Math.max(0, Math.min(1, norm))
         const rgbStr = interpolator(norm)
         const { r, g, b } = parseToRgb(rgbStr)
         const heatColor = `rgba(${r}, ${g}, ${b}, ${chartOpacity})`

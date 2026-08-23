@@ -50,6 +50,7 @@ export interface Settings {
   chartOpacity: number
   barColorScheme: string
   heatmapColorScheme: string
+  divergingColorScheme: string
 
   // Parser Settings
   includeAllIntegerColumns: boolean
@@ -71,6 +72,7 @@ export const DEFAULT_SETTINGS: Settings = {
   chartOpacity: 0.35,
   barColorScheme: 'Pastel1',
   heatmapColorScheme: 'Cividis',
+  divergingColorScheme: 'PuOr',
   includeAllIntegerColumns: false,
   includeScientificNotation: false,
   urlWhitelist: DEFAULT_WHITELIST,
@@ -82,6 +84,7 @@ export interface LocalTableSetting {
   settings: Partial<{
     barColorScheme: string
     heatmapColorScheme: string
+    divergingColorScheme: string
   }>
 }
 
@@ -91,14 +94,17 @@ export type LocalSettingsMap = Record<string, LocalTableSetting>
 /** Maximum number of per-table local overrides stored. */
 export const LOCAL_SETTINGS_CAP = 1000
 
-/** Continuous D3 color scale interpolators (Sequential & Diverging) */
-export const PRESET_COLORMAPS: Record<string, (t: number) => string> = {
+/** Perceptual & Single-hue Sequential D3 color scale interpolators */
+export const PRESET_SEQUENTIAL_COLORMAPS: Record<
+  string,
+  (t: number) => string
+> = {
   // Perceptual
+  Cividis: interpolateCividis,
   Viridis: interpolateViridis,
   Plasma: interpolatePlasma,
   Inferno: interpolateInferno,
   Magma: interpolateMagma,
-  Cividis: interpolateCividis,
   Turbo: interpolateTurbo,
   Warm: interpolateWarm,
   Cool: interpolateCool,
@@ -110,17 +116,28 @@ export const PRESET_COLORMAPS: Record<string, (t: number) => string> = {
   Oranges: interpolateOranges,
   Purples: interpolatePurples,
   Reds: interpolateReds,
+}
 
-  // Diverging
-  Spectral: interpolateSpectral,
+/** Diverging D3 color scale interpolators */
+export const PRESET_DIVERGING_COLORMAPS: Record<
+  string,
+  (t: number) => string
+> = {
+  PuOr: interpolatePuOr,
+  RdBu: interpolateRdBu,
   RdYlBu: interpolateRdYlBu,
   RdYlGn: interpolateRdYlGn,
-  RdBu: interpolateRdBu,
-  RdGy: interpolateRdGy,
+  Spectral: interpolateSpectral,
   PiYG: interpolatePiYG,
   PRGn: interpolatePRGn,
-  PuOr: interpolatePuOr,
   BrBG: interpolateBrBG,
+  RdGy: interpolateRdGy,
+}
+
+/** Continuous D3 color scale interpolators (Sequential & Diverging) */
+export const PRESET_COLORMAPS: Record<string, (t: number) => string> = {
+  ...PRESET_SEQUENTIAL_COLORMAPS,
+  ...PRESET_DIVERGING_COLORMAPS,
 }
 
 /** Categorical D3 color schemes */
@@ -235,6 +252,10 @@ export function getSettings(): Settings {
       'heatmapColorScheme',
       getValue('colorMap', DEFAULT_SETTINGS.heatmapColorScheme),
     ),
+    divergingColorScheme: getValue<string>(
+      'divergingColorScheme',
+      DEFAULT_SETTINGS.divergingColorScheme,
+    ),
     includeAllIntegerColumns: getValue<boolean>(
       'includeAllIntegerColumns',
       DEFAULT_SETTINGS.includeAllIntegerColumns,
@@ -271,6 +292,9 @@ export function updateSettings(partial: Partial<Settings>): Settings {
   }
   if (partial.heatmapColorScheme !== undefined) {
     setValue('heatmapColorScheme', updated.heatmapColorScheme)
+  }
+  if (partial.divergingColorScheme !== undefined) {
+    setValue('divergingColorScheme', updated.divergingColorScheme)
   }
   if (partial.includeAllIntegerColumns !== undefined) {
     setValue('includeAllIntegerColumns', updated.includeAllIntegerColumns)
@@ -515,7 +539,11 @@ export function getLocalTableSettings(
  */
 export function setLocalTableSettings(
   compositeKey: string,
-  settings: Partial<{ barColorScheme: string; heatmapColorScheme: string }>,
+  settings: Partial<{
+    barColorScheme: string
+    heatmapColorScheme: string
+    divergingColorScheme: string
+  }>,
 ): void {
   const map = getValue<LocalSettingsMap>('localTableSettings', {})
   map[compositeKey] = { lastUsed: Date.now(), settings }
@@ -567,6 +595,9 @@ export function getEffectiveSettings(compositeKey?: string): Settings {
   }
   if (entry.settings.heatmapColorScheme !== undefined) {
     merged.heatmapColorScheme = entry.settings.heatmapColorScheme
+  }
+  if (entry.settings.divergingColorScheme !== undefined) {
+    merged.divergingColorScheme = entry.settings.divergingColorScheme
   }
   return merged
 }
