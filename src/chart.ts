@@ -127,14 +127,15 @@ function buildGradient(
   }
 
   // Bipolar column (min < 0 and max > 0)
-  const range = max - min
-  const zeroPct = ((0 - min) / range) * 100
-  const valPct = ((value - min) / range) * 100
+  const absMax = Math.max(Math.abs(min), Math.abs(max))
+  const zeroPct = 50
 
   if (value >= 0) {
+    const valPct = 50 + (value / absMax) * 50
     const color = isHighlighted ? colors.posAccent : colors.pos
     return `linear-gradient(to right, transparent ${zeroPct}%, ${color} ${zeroPct}%, ${color} ${valPct}%, transparent ${valPct}%)`
   } else {
+    const valPct = 50 - (Math.abs(value) / absMax) * 50
     const color = isHighlighted ? colors.negAccent : colors.neg
     return `linear-gradient(to right, transparent ${valPct}%, ${color} ${valPct}%, ${color} ${zeroPct}%, transparent ${zeroPct}%)`
   }
@@ -175,12 +176,11 @@ export function applyInlineBars(
     const baseColor = palette[c % palette.length]
     const { r, g, b } = parseToRgb(baseColor)
     const colorStr = `rgba(${r}, ${g}, ${b}, ${chartOpacity})`
-    const negStr = `rgba(244, 67, 54, ${chartOpacity})`
     columnBarColors.push({
       pos: colorStr,
       posAccent: colorStr,
-      neg: negStr,
-      negAccent: negStr,
+      neg: colorStr,
+      negAccent: colorStr,
     })
   }
 
@@ -223,12 +223,11 @@ export function applyInlineBars(
           const rgbStr = interpolator(norm)
           const { r, g, b } = parseToRgb(rgbStr)
           const colorStr = `rgba(${r}, ${g}, ${b}, ${chartOpacity})`
-          const negStr = `rgba(244, 67, 54, ${chartOpacity})`
           barColors = {
             pos: colorStr,
             posAccent: colorStr,
-            neg: negStr,
-            negAccent: negStr,
+            neg: colorStr,
+            negAccent: colorStr,
           }
         }
         cell.style.background = buildGradient(

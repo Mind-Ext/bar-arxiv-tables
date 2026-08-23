@@ -179,6 +179,107 @@ describe('Chart & Visualization Styling', () => {
       expect(td1.style.background).toContain('linear-gradient(to right,')
       expect(td0.style.background).not.toEqual(td1.style.background)
     })
+
+    it('renders bipolar columns with centered zero at 50% and consistent column palette colors', () => {
+      updateSettings({ barColorScheme: 'tab10' })
+      // tab10[0] = #1f77b4 -> rgb(31, 119, 180)
+
+      const dom = new JSDOM(`
+        <figure>
+          <table>
+            <tr><td>-10</td></tr>
+            <tr><td>10</td></tr>
+            <tr><td>20</td></tr>
+          </table>
+        </figure>
+      `)
+
+      const table = dom.window.document.querySelector(
+        'table',
+      ) as HTMLTableElement
+      const tdNeg = table.rows[0].cells[0]
+      const tdPos1 = table.rows[1].cells[0]
+      const tdPos2 = table.rows[2].cells[0]
+
+      const parsed: ParsedTable = {
+        caption: 'Bipolar Test',
+        colNames: [['Metric']],
+        rowNames: [['R1'], ['R2'], ['R3']],
+        topNonNumRows: 0,
+        leftNonNumCols: 0,
+        data: [
+          [{ value: -10, isHighlighted: false, raw: '-10' }],
+          [{ value: 10, isHighlighted: false, raw: '10' }],
+          [{ value: 20, isHighlighted: false, raw: '20' }],
+        ],
+        domCells: [[tdNeg], [tdPos1], [tdPos2]],
+        orientation: 'column',
+      }
+
+      applyInlineBars(parsed, table)
+
+      // Both positive and negative cells use the column's tab10[0] color rgba(31, 119, 180, 0.35)
+      expect(tdNeg.style.background).toContain('rgba(31, 119, 180, 0.35)')
+      expect(tdPos1.style.background).toContain('rgba(31, 119, 180, 0.35)')
+      expect(tdPos2.style.background).toContain('rgba(31, 119, 180, 0.35)')
+
+      // absMax = 20:
+      // value = -10 -> valPct = 50 - (10/20)*50 = 25%. Bar spans 25% to 50%
+      expect(tdNeg.style.background).toContain(
+        'linear-gradient(to right, transparent 25%, rgba(31, 119, 180, 0.35) 25%, rgba(31, 119, 180, 0.35) 50%, transparent 50%)',
+      )
+
+      // value = +10 -> valPct = 50 + (10/20)*50 = 75%. Bar spans 50% to 75%
+      expect(tdPos1.style.background).toContain(
+        'linear-gradient(to right, transparent 50%, rgba(31, 119, 180, 0.35) 50%, rgba(31, 119, 180, 0.35) 75%, transparent 75%)',
+      )
+
+      // value = +20 -> valPct = 50 + (20/20)*50 = 100%. Bar spans 50% to 100%
+      expect(tdPos2.style.background).toContain(
+        'linear-gradient(to right, transparent 50%, rgba(31, 119, 180, 0.35) 50%, rgba(31, 119, 180, 0.35) 100%, transparent 100%)',
+      )
+    })
+
+    it('renders all-negative columns with column palette colors', () => {
+      updateSettings({ barColorScheme: 'tab10' })
+
+      const dom = new JSDOM(`
+        <figure>
+          <table>
+            <tr><td>-5</td></tr>
+            <tr><td>-15</td></tr>
+          </table>
+        </figure>
+      `)
+
+      const table = dom.window.document.querySelector(
+        'table',
+      ) as HTMLTableElement
+      const td0 = table.rows[0].cells[0]
+      const td1 = table.rows[1].cells[0]
+
+      const parsed: ParsedTable = {
+        caption: 'Negative Test',
+        colNames: [['Metric']],
+        rowNames: [['R1'], ['R2']],
+        topNonNumRows: 0,
+        leftNonNumCols: 0,
+        data: [
+          [{ value: -5, isHighlighted: false, raw: '-5' }],
+          [{ value: -15, isHighlighted: false, raw: '-15' }],
+        ],
+        domCells: [[td0], [td1]],
+        orientation: 'column',
+      }
+
+      applyInlineBars(parsed, table)
+
+      // Uses column color tab10[0] rgba(31, 119, 180, 0.35) without hardcoded red
+      expect(td0.style.background).toContain('rgba(31, 119, 180, 0.35)')
+      expect(td1.style.background).toContain('rgba(31, 119, 180, 0.35)')
+      expect(td0.style.background).toContain('linear-gradient(to left,')
+      expect(td1.style.background).toContain('linear-gradient(to left,')
+    })
   })
 
   describe('Button Injection & Styling', () => {
