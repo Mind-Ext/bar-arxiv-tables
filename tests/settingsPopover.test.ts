@@ -549,6 +549,48 @@ describe('Settings Popover UI', () => {
       expect(popover.style.position).toBe('fixed')
     })
 
+    it('anchors lower-left corner beside the button when space permits', () => {
+      vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(1200)
+      vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(800)
+      vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
+        left: 500,
+        top: 400,
+        right: 550,
+        bottom: 430,
+        width: 50,
+        height: 30,
+        x: 500,
+        y: 400,
+        toJSON: () => {},
+      })
+
+      toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
+      const popover = getPopover()!
+      expect(popover.style.left).toBe('558px')
+      expect(popover.style.position).toBe('fixed')
+    })
+
+    it('dodges when anchor is too close to the right edge of viewport', () => {
+      vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(800)
+      vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(800)
+      vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
+        left: 750,
+        top: 300,
+        right: 790,
+        bottom: 330,
+        width: 40,
+        height: 30,
+        x: 750,
+        y: 300,
+        toJSON: () => {},
+      })
+
+      toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
+      const popover = getPopover()!
+      // left + 0 > 792 -> left = min(792, 790) = 790px, top = 330 + 4 = 334px
+      expect(popover.style.top).toBe('334px')
+    })
+
     it('repositions popover when dragged via header', () => {
       toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
       const popover = getPopover()!

@@ -588,25 +588,57 @@ export function toggleSettingsPopover(
   }
   `
 
-  // Position relative to anchor using fixed positioning (avoids overflow clipping)
-  const rect = anchorEl.getBoundingClientRect()
+  // Mount to DOM so dimensions can be measured
   popover.style.position = 'fixed'
-  popover.style.top = `${rect.bottom + 4}px`
-  popover.style.right = `${Math.max(0, window.innerWidth - rect.right)}px`
-
   document.body.appendChild(popover)
   currentPopover = popover
   currentAnchor = anchorEl
 
-  // Adjust if popover overflows viewport edges
+  // Position relative to anchor: anchor lower-left corner beside the button
+  const rect = anchorEl.getBoundingClientRect()
   const popoverRect = popover.getBoundingClientRect()
-  if (popoverRect.bottom > window.innerHeight) {
-    popover.style.top = `${Math.max(0, rect.top - popoverRect.height - 4)}px`
+  const margin = 8
+
+  // Default placement: lower-left corner anchored beside button
+  let left = rect.right + margin
+  let top = rect.bottom - popoverRect.height
+
+  // 1. Horizontal collision (not enough room on right of button)
+  if (left + popoverRect.width > window.innerWidth - margin) {
+    // Fall back to below the button, aligned with right or screen edge
+    left = Math.max(
+      margin,
+      Math.min(
+        window.innerWidth - popoverRect.width - margin,
+        rect.right - popoverRect.width,
+      ),
+    )
+    top = rect.bottom + 4
   }
-  if (popoverRect.left < 0) {
-    popover.style.right = 'auto'
-    popover.style.left = '4px'
+
+  // 2. Vertical collision adjustments
+  if (top < margin) {
+    if (rect.bottom + 4 + popoverRect.height <= window.innerHeight) {
+      top = rect.bottom + 4
+    } else {
+      top = Math.max(margin, top)
+    }
+  } else if (top + popoverRect.height > window.innerHeight - margin) {
+    if (rect.top - popoverRect.height - 4 >= margin) {
+      top = rect.top - popoverRect.height - 4
+    } else {
+      top = Math.max(margin, window.innerHeight - popoverRect.height - margin)
+    }
   }
+
+  // 3. Left edge clamp
+  if (left < margin) {
+    left = margin
+  }
+
+  popover.style.left = `${left}px`
+  popover.style.top = `${top}px`
+  popover.style.right = 'auto'
 
   // --- Drag support via header ---
   const header = popover.querySelector('.b-a-t-settings-header') as HTMLElement
