@@ -1,8 +1,8 @@
 /**
  * Settings Popover UI Component for arXiv Chart Visualizer.
  *
- * Provides a two-tab popover (Local / Global) for configuring per-table
- * and global default visualization settings with live preview.
+ * Provides a modular, per-tab popover (Current Table / Visualization / Site Whitelist)
+ * for configuring per-table and global default visualization settings with live preview.
  */
 
 import {
@@ -24,16 +24,42 @@ import {
   updateSettings,
 } from '../settings'
 
-/** Currently open popover element, or null. */
+// ---------------------------------------------------------------------------
+// Module State & Types
+// ---------------------------------------------------------------------------
+
 let currentPopover: HTMLElement | null = null
 let currentAnchor: HTMLElement | null = null
 let closeHandler: ((e: MouseEvent) => void) | null = null
 let keyHandler: ((e: KeyboardEvent) => void) | null = null
 let cleanupOnClose: (() => void) | null = null
 
-/**
- * Inject the settings popover CSS into the document head (once).
- */
+export interface ColorSchemeGroupValues {
+  barColorScheme: string
+  heatmapColorScheme: string
+  divergingColorScheme: string
+}
+
+export interface TabRenderContext {
+  compositeKey: string
+  options: {
+    bar: string
+    heatSeq: string
+    heatDiv: string
+  }
+}
+
+export interface SettingsTab {
+  id: 'local' | 'global' | 'whitelist'
+  label: string
+  isAvailable: (ctx: TabRenderContext) => boolean
+  renderPanel: (isActive: boolean, ctx: TabRenderContext) => string
+}
+
+// ---------------------------------------------------------------------------
+// CSS Styles
+// ---------------------------------------------------------------------------
+
 function cssOnce(): void {
   if (document.getElementById('b-a-t-settings-styles')) {
     return
@@ -215,10 +241,10 @@ function cssOnce(): void {
   document.head.appendChild(style)
 }
 
-/**
- * Build <option> HTML for a color scheme dropdown.
- * @param category - Palette/all colormaps, sequential colormaps, or diverging colormaps.
- */
+// ---------------------------------------------------------------------------
+// Option Generators & Shared Field Helpers
+// ---------------------------------------------------------------------------
+
 function getOptionsHTML(
   category: 'palette' | 'sequential' | 'diverging',
 ): string {
@@ -251,6 +277,209 @@ function getOptionsHTML(
   return options.join('')
 }
 
+function renderColorSchemeGroup(
+  prefix: string,
+  options: { bar: string; heatSeq: string; heatDiv: string },
+): string {
+  const p = prefix ? `${prefix}-` : ''
+  return `
+    <div class="b-a-t-settings-field">
+      <label>Bar Color Scheme</label>
+      <select name="${p}barColorScheme">
+        ${options.bar}
+      </select>
+      <input type="text" class="b-a-t-settings-custom-input" data-custom-input="${p}barColorScheme" placeholder="#ff5733, #33ff57">
+    </div>
+
+    <div class="b-a-t-settings-field">
+      <label>Heatmap Color Scheme (Sequential)</label>
+      <select name="${p}heatmapColorScheme">
+        ${options.heatSeq}
+      </select>
+      <input type="text" class="b-a-t-settings-custom-input" data-custom-input="${p}heatmapColorScheme" placeholder="#ff5733, #33ff57">
+    </div>
+
+    <div class="b-a-t-settings-field">
+      <label>Heatmap Color Scheme (Diverging)</label>
+      <select name="${p}divergingColorScheme">
+        ${options.heatDiv}
+      </select>
+      <input type="text" class="b-a-t-settings-custom-input" data-custom-input="${p}divergingColorScheme" placeholder="#ff5733, #33ff57">
+    </div>
+  `
+}
+
+// ---------------------------------------------------------------------------
+// Per-Tab Definitions
+// ---------------------------------------------------------------------------
+
+const localTab: SettingsTab = {
+  id: 'local',
+  label: 'Current Table',
+  isAvailable: (ctx) => Boolean(ctx.compositeKey),
+  renderPanel: (isActive, ctx) => `
+    <div class="b-a-t-settings-panel ${
+    isActive ? 'active' : ''
+  }" data-panel="local">
+      <div id="local-status-badge" class="b-a-t-settings-badge b-a-t-badge-global">Using Global Defaults</div>
+
+      ${renderColorSchemeGroup('local', ctx.options)}
+
+      <div class="b-a-t-settings-footer">
+        <button class="b-a-t-btn" data-action="reset-local">Reset to Global</button>
+        <button class="b-a-t-btn b-a-t-btn-primary" data-action="apply">Save for Table</button>
+      </div>
+    </div>
+  `,
+}
+
+const globalTab: SettingsTab = {
+  id: 'global',
+  label: 'Visualization',
+  isAvailable: () => true,
+  renderPanel: (isActive, ctx) => `
+    <div class="b-a-t-settings-panel ${
+    isActive ? 'active' : ''
+  }" data-panel="global">
+      <div class="b-a-t-settings-group">
+        <div class="b-a-t-settings-group-title">Render Settings</div>
+
+        <div class="b-a-t-settings-field">
+          <label>Auto-Visualize</label>
+          <select name="autoVisualize">
+            <option value="off">Off</option>
+            <option value="bars">Bars</option>
+            <option value="heatmap">Heatmap</option>
+          </select>
+        </div>
+
+        ${renderColorSchemeGroup('', ctx.options)}
+
+        <div class="b-a-t-settings-field">
+          <label>Chart Opacity</label>
+          <input type="number" name="chartOpacity" min="0" max="1" step="0.05" placeholder="0.35">
+        </div>
+
+        <div class="b-a-t-settings-field">
+          <label>Button Opacity</label>
+          <input type="number" name="buttonOpacity" min="0" max="1" step="0.05" placeholder="0.5">
+        </div>
+      </div>
+
+      <div class="b-a-t-settings-group">
+        <div class="b-a-t-settings-group-title">Parser Settings</div>
+
+        <div class="b-a-t-settings-field-checkbox">
+          <input type="checkbox" name="includeAllIntegerColumns" id="cb-int">
+          <label for="cb-int">Include All-Integer Columns</label>
+        </div>
+
+        <div class="b-a-t-settings-field-checkbox">
+          <input type="checkbox" name="includeScientificNotation" id="cb-sci">
+          <label for="cb-sci">Include Scientific Notation</label>
+        </div>
+      </div>
+
+      <div class="b-a-t-settings-footer">
+        <button class="b-a-t-btn" data-action="reset-global">Reset to Defaults</button>
+        <button class="b-a-t-btn b-a-t-btn-primary" data-action="save-global">Save Global</button>
+      </div>
+    </div>
+  `,
+}
+
+const whitelistTab: SettingsTab = {
+  id: 'whitelist',
+  label: 'Site Whitelist',
+  isAvailable: () => true,
+  renderPanel: (isActive) => `
+    <div class="b-a-t-settings-panel ${
+    isActive ? 'active' : ''
+  }" data-panel="whitelist">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <span style="font-weight: 500; font-size: 12px;">Current Site Status:</span>
+        <span id="whitelist-status-badge" class="b-a-t-settings-badge b-a-t-badge-global">Checking...</span>
+      </div>
+
+      <div style="margin-bottom: 10px;">
+        <button type="button" class="b-a-t-btn" data-action="toggle-current-domain" style="width: 100%; text-align: center;">
+          ➕ Whitelist Current Domain
+        </button>
+      </div>
+
+      <div class="b-a-t-settings-field">
+        <label>Allowed URL Rules (one per line):</label>
+        <textarea name="urlWhitelist" class="b-a-t-settings-textarea" placeholder="*://arxiv.org/html/*&#10;*://ar5iv.labs.arxiv.org/html/*&#10;file:///*.html&#10;biorxiv.org&#10;/\/papers\/\d+/"></textarea>
+        <div class="b-a-t-help-text">
+          Supports domain names (<code>biorxiv.org</code>), wildcards (<code>*arxiv.org/html/*</code>, <code>file:///*.html</code>), or <code>/regex/</code>. Lines starting with <code>#</code> are comments.
+        </div>
+      </div>
+
+      <div class="b-a-t-settings-footer">
+        <button class="b-a-t-btn" data-action="reset-whitelist">Reset Whitelist</button>
+        <button class="b-a-t-btn b-a-t-btn-primary" data-action="save-whitelist">Save Whitelist</button>
+      </div>
+    </div>
+  `,
+}
+
+const SETTINGS_TABS: SettingsTab[] = [localTab, globalTab, whitelistTab]
+
+// ---------------------------------------------------------------------------
+// Grouped State Readers & Writers
+// ---------------------------------------------------------------------------
+
+function getGroupSchemeValues(
+  root: HTMLElement,
+  prefix = '',
+): ColorSchemeGroupValues {
+  const p = prefix ? `${prefix}-` : ''
+  const readField = (name: string): string => {
+    const sel = root.querySelector<HTMLSelectElement>(`select[name="${name}"]`)
+    const input = root.querySelector<HTMLInputElement>(
+      `input[data-custom-input="${name}"]`,
+    )
+    if (!sel) return ''
+    return sel.value === 'custom' ? (input?.value ?? '') : sel.value
+  }
+  return {
+    barColorScheme: readField(`${p}barColorScheme`),
+    heatmapColorScheme: readField(`${p}heatmapColorScheme`),
+    divergingColorScheme: readField(`${p}divergingColorScheme`),
+  }
+}
+
+function setGroupSchemeValues(
+  root: HTMLElement,
+  values: ColorSchemeGroupValues,
+  prefix = '',
+): void {
+  const p = prefix ? `${prefix}-` : ''
+  const writeField = (name: string, val: string) => {
+    const sel = root.querySelector<HTMLSelectElement>(`select[name="${name}"]`)
+    const input = root.querySelector<HTMLInputElement>(
+      `input[data-custom-input="${name}"]`,
+    )
+    if (!sel || !input) return
+    const isPreset = Array.from(sel.options).some((o) => o.value === val)
+    if (isPreset) {
+      sel.value = val
+      input.classList.remove('active')
+    } else {
+      sel.value = 'custom'
+      input.value = val
+      input.classList.add('active')
+    }
+  }
+  writeField(`${p}barColorScheme`, values.barColorScheme)
+  writeField(`${p}heatmapColorScheme`, values.heatmapColorScheme)
+  writeField(`${p}divergingColorScheme`, values.divergingColorScheme)
+}
+
+// ---------------------------------------------------------------------------
+// Popover Lifecycle & Mounting
+// ---------------------------------------------------------------------------
+
 /** Close the currently open popover and remove listeners. */
 function closePopover(): void {
   if (cleanupOnClose) {
@@ -273,11 +502,12 @@ function closePopover(): void {
 }
 
 /**
- * Toggle the settings popover for a specific table.
+ * Toggle the settings popover for a specific table or globally.
  *
- * @param anchorEl - The element to anchor the popover to (gear button's parent container).
- * @param compositeKey - The composite key identifying this table.
- * @param onUpdate - Callback invoked after settings are applied/saved/reset.
+ * @param anchorEl - The element to anchor the popover to (gear button or global anchor container).
+ * @param compositeKey - The composite key identifying this table (empty for global settings).
+ * @param onUpdate - Callback invoked after settings are applied/saved/reset/previewed.
+ * @param initialTab - Optional tab to activate on opening.
  */
 export function toggleSettingsPopover(
   anchorEl: HTMLElement,
@@ -318,9 +548,16 @@ export function toggleSettingsPopover(
     }
   }
 
-  const barOptions = getOptionsHTML('palette')
-  const heatSeqOptions = getOptionsHTML('sequential')
-  const heatDivOptions = getOptionsHTML('diverging')
+  const context: TabRenderContext = {
+    compositeKey,
+    options: {
+      bar: getOptionsHTML('palette'),
+      heatSeq: getOptionsHTML('sequential'),
+      heatDiv: getOptionsHTML('diverging'),
+    },
+  }
+
+  const availableTabs = SETTINGS_TABS.filter((tab) => tab.isAvailable(context))
   const defaultTab = initialTab || (compositeKey ? 'local' : 'global')
 
   const popover = document.createElement('div')
@@ -332,158 +569,23 @@ export function toggleSettingsPopover(
     </div>
     <div class="b-a-t-settings-tabs">
       ${
-    compositeKey
-      ? `<div class="b-a-t-settings-tab ${
-        defaultTab === 'local' ? 'active' : ''
-      }" data-tab="local">Current Table</div>`
-      : ''
+    availableTabs
+      .map(
+        (t) => `
+        <div class="b-a-t-settings-tab ${
+          t.id === defaultTab ? 'active' : ''
+        }" data-tab="${t.id}">
+          ${t.label}
+        </div>`,
+      )
+      .join('')
   }
-      <div class="b-a-t-settings-tab ${
-    defaultTab === 'global' ? 'active' : ''
-  }" data-tab="global">Visualization</div>
-      <div class="b-a-t-settings-tab ${
-    defaultTab === 'whitelist' ? 'active' : ''
-  }" data-tab="whitelist">Site Whitelist</div>
     </div>
-
     ${
-    compositeKey
-      ? `
-    <div class="b-a-t-settings-panel ${
-        defaultTab === 'local' ? 'active' : ''
-      }" data-panel="local">
-      <div id="local-status-badge" class="b-a-t-settings-badge b-a-t-badge-global">Using Global Defaults</div>
-
-      <div class="b-a-t-settings-field">
-        <label>Bar Color Scheme</label>
-        <select name="local-barColorScheme">
-          ${barOptions}
-        </select>
-        <input type="text" class="b-a-t-settings-custom-input" data-custom-input="local-barColorScheme" placeholder="#ff5733, #33ff57">
-      </div>
-
-      <div class="b-a-t-settings-field">
-        <label>Heatmap Color Scheme (Sequential)</label>
-        <select name="local-heatmapColorScheme">
-          ${heatSeqOptions}
-        </select>
-        <input type="text" class="b-a-t-settings-custom-input" data-custom-input="local-heatmapColorScheme" placeholder="#ff5733, #33ff57">
-      </div>
-
-      <div class="b-a-t-settings-field">
-        <label>Heatmap Color Scheme (Diverging)</label>
-        <select name="local-divergingColorScheme">
-          ${heatDivOptions}
-        </select>
-        <input type="text" class="b-a-t-settings-custom-input" data-custom-input="local-divergingColorScheme" placeholder="#ff5733, #33ff57">
-      </div>
-
-      <div class="b-a-t-settings-footer">
-        <button class="b-a-t-btn" data-action="reset-local">Reset to Global</button>
-        <button class="b-a-t-btn b-a-t-btn-primary" data-action="apply">Save for Table</button>
-      </div>
-    </div>
-    `
-      : ''
+    availableTabs
+      .map((t) => t.renderPanel(t.id === defaultTab, context))
+      .join('')
   }
-
-    <div class="b-a-t-settings-panel ${
-    defaultTab === 'global' ? 'active' : ''
-  }" data-panel="global">
-      <div class="b-a-t-settings-group">
-        <div class="b-a-t-settings-group-title">Render Settings</div>
-
-        <div class="b-a-t-settings-field">
-          <label>Auto-Visualize</label>
-          <select name="autoVisualize">
-            <option value="off">Off</option>
-            <option value="bars">Bars</option>
-            <option value="heatmap">Heatmap</option>
-          </select>
-        </div>
-
-        <div class="b-a-t-settings-field">
-          <label>Bar Color Scheme</label>
-          <select name="barColorScheme">
-            ${barOptions}
-          </select>
-          <input type="text" class="b-a-t-settings-custom-input" data-custom-input="barColorScheme" placeholder="#ff5733, #33ff57">
-        </div>
-
-        <div class="b-a-t-settings-field">
-          <label>Heatmap Color Scheme (Sequential)</label>
-          <select name="heatmapColorScheme">
-            ${heatSeqOptions}
-          </select>
-          <input type="text" class="b-a-t-settings-custom-input" data-custom-input="heatmapColorScheme" placeholder="#ff5733, #33ff57">
-        </div>
-
-        <div class="b-a-t-settings-field">
-          <label>Heatmap Color Scheme (Diverging)</label>
-          <select name="divergingColorScheme">
-            ${heatDivOptions}
-          </select>
-          <input type="text" class="b-a-t-settings-custom-input" data-custom-input="divergingColorScheme" placeholder="#ff5733, #33ff57">
-        </div>
-
-        <div class="b-a-t-settings-field">
-          <label>Chart Opacity</label>
-          <input type="number" name="chartOpacity" min="0" max="1" step="0.05" placeholder="0.35">
-        </div>
-
-        <div class="b-a-t-settings-field">
-          <label>Button Opacity</label>
-          <input type="number" name="buttonOpacity" min="0" max="1" step="0.05" placeholder="0.5">
-        </div>
-      </div>
-
-      <div class="b-a-t-settings-group">
-        <div class="b-a-t-settings-group-title">Parser Settings</div>
-
-        <div class="b-a-t-settings-field-checkbox">
-          <input type="checkbox" name="includeAllIntegerColumns" id="cb-int">
-          <label for="cb-int">Include All-Integer Columns</label>
-        </div>
-
-        <div class="b-a-t-settings-field-checkbox">
-          <input type="checkbox" name="includeScientificNotation" id="cb-sci">
-          <label for="cb-sci">Include Scientific Notation</label>
-        </div>
-      </div>
-
-      <div class="b-a-t-settings-footer">
-        <button class="b-a-t-btn" data-action="reset-global">Reset to Defaults</button>
-        <button class="b-a-t-btn b-a-t-btn-primary" data-action="save-global">Save Global</button>
-      </div>
-    </div>
-
-    <div class="b-a-t-settings-panel ${
-    defaultTab === 'whitelist' ? 'active' : ''
-  }" data-panel="whitelist">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-        <span style="font-weight: 500; font-size: 12px;">Current Site Status:</span>
-        <span id="whitelist-status-badge" class="b-a-t-settings-badge b-a-t-badge-global">Checking...</span>
-      </div>
-
-      <div style="margin-bottom: 10px;">
-        <button type="button" class="b-a-t-btn" data-action="toggle-current-domain" style="width: 100%; text-align: center;">
-          ➕ Whitelist Current Domain
-        </button>
-      </div>
-
-      <div class="b-a-t-settings-field">
-        <label>Allowed URL Rules (one per line):</label>
-        <textarea name="urlWhitelist" class="b-a-t-settings-textarea" placeholder="*://arxiv.org/html/*&#10;*://ar5iv.labs.arxiv.org/html/*&#10;file:///*.html&#10;biorxiv.org&#10;/\/papers\/\d+/"></textarea>
-        <div class="b-a-t-help-text">
-          Supports domain names (<code>biorxiv.org</code>), wildcards (<code>*arxiv.org/html/*</code>, <code>file:///*.html</code>), or <code>/regex/</code>. Lines starting with <code>#</code> are comments.
-        </div>
-      </div>
-
-      <div class="b-a-t-settings-footer">
-        <button class="b-a-t-btn" data-action="reset-whitelist">Reset Whitelist</button>
-        <button class="b-a-t-btn b-a-t-btn-primary" data-action="save-whitelist">Save Whitelist</button>
-      </div>
-    </div>
   `
 
   // Position relative to anchor using fixed positioning (avoids overflow clipping)
@@ -499,19 +601,15 @@ export function toggleSettingsPopover(
   // Adjust if popover overflows viewport edges
   const popoverRect = popover.getBoundingClientRect()
   if (popoverRect.bottom > window.innerHeight) {
-    // Flip above the anchor
     popover.style.top = `${Math.max(0, rect.top - popoverRect.height - 4)}px`
   }
   if (popoverRect.left < 0) {
-    // Clamp so left edge stays on screen
     popover.style.right = 'auto'
     popover.style.left = '4px'
   }
 
   // --- Drag support via header ---
-  const header = popover.querySelector(
-    '.b-a-t-settings-header',
-  ) as HTMLElement
+  const header = popover.querySelector('.b-a-t-settings-header') as HTMLElement
   let isDragging = false
   let dragOffsetX = 0
   let dragOffsetY = 0
@@ -542,315 +640,220 @@ export function toggleSettingsPopover(
     header.style.cursor = 'grab'
   })
 
-  // --- Element references ---
-  // Note: Local controls are typed as T | null because the Local panel is
-  // conditionally rendered only when a table composite key is present.
-  // Global and Whitelist controls are always rendered into the DOM.
+  // --- Helpers for State Sync & Badges ---
 
-  const q = <T extends HTMLElement>(selector: string) =>
-    popover.querySelector(selector) as T | null
-  const qa = <T extends HTMLElement>(selector: string) =>
-    popover.querySelectorAll(selector) as NodeListOf<T>
+  const localBadge = popover.querySelector<HTMLElement>('#local-status-badge')
+  const whitelistBadge = popover.querySelector<HTMLElement>(
+    '#whitelist-status-badge',
+  )
+  const toggleDomainBtn = popover.querySelector<HTMLButtonElement>(
+    '[data-action="toggle-current-domain"]',
+  )
+  const whitelistTextarea = popover.querySelector<HTMLTextAreaElement>(
+    'textarea[name="urlWhitelist"]',
+  )
 
-  const els = {
-    tabs: qa('[data-tab]'),
-    panels: qa('[data-panel]'),
-    localStatus: q('#local-status-badge'),
-    whitelistStatus: q('#whitelist-status-badge'),
-    toggleDomainBtn: q<HTMLButtonElement>(
-      '[data-action="toggle-current-domain"]',
-    ),
-    whitelistTextarea: q<HTMLTextAreaElement>('textarea[name="urlWhitelist"]'),
-
-    localBarSel: q<HTMLSelectElement>('[name="local-barColorScheme"]'),
-    localBarInput: q<HTMLInputElement>(
-      '[data-custom-input="local-barColorScheme"]',
-    ),
-    localHeatSel: q<HTMLSelectElement>('[name="local-heatmapColorScheme"]'),
-    localHeatInput: q<HTMLInputElement>(
-      '[data-custom-input="local-heatmapColorScheme"]',
-    ),
-    localDivSel: q<HTMLSelectElement>('[name="local-divergingColorScheme"]'),
-    localDivInput: q<HTMLInputElement>(
-      '[data-custom-input="local-divergingColorScheme"]',
-    ),
-
-    globalAutoVis: q<HTMLSelectElement>('[name="autoVisualize"]')!,
-    globalBarSel: q<HTMLSelectElement>('[name="barColorScheme"]')!,
-    globalBarInput: q<HTMLInputElement>(
-      '[data-custom-input="barColorScheme"]',
-    )!,
-    globalHeatSel: q<HTMLSelectElement>('[name="heatmapColorScheme"]')!,
-    globalHeatInput: q<HTMLInputElement>(
-      '[data-custom-input="heatmapColorScheme"]',
-    )!,
-    globalDivSel: q<HTMLSelectElement>('[name="divergingColorScheme"]')!,
-    globalDivInput: q<HTMLInputElement>(
-      '[data-custom-input="divergingColorScheme"]',
-    )!,
-    globalChartOpacity: q<HTMLInputElement>('[name="chartOpacity"]')!,
-    globalButtonOpacity: q<HTMLInputElement>('[name="buttonOpacity"]')!,
-    globalIncInt: q<HTMLInputElement>('[name="includeAllIntegerColumns"]')!,
-    globalIncSci: q<HTMLInputElement>('[name="includeScientificNotation"]')!,
-  }
-
-  // --- Helpers ---
-
-  /** Populate a select + custom-input pair from a setting value. */
-  const setSchemeField = (
-    sel: HTMLSelectElement | null,
-    input: HTMLInputElement | null,
-    val: string,
-  ): void => {
-    if (!sel || !input) return
-    let found = false
-    for (let i = 0; i < sel.options.length; i++) {
-      if (sel.options[i].value === val) {
-        found = true
-        break
-      }
-    }
-    if (found) {
-      sel.value = val
-      input.classList.remove('active')
-    } else {
-      sel.value = 'custom'
-      input.value = val
-      input.classList.add('active')
-    }
-  }
-
-  /** Read value from a select + custom-input pair. */
-  const getSchemeField = (
-    sel: HTMLSelectElement | null,
-    input: HTMLInputElement | null,
-  ): string => {
-    if (!sel || !input) return ''
-    return sel.value === 'custom' ? input.value : sel.value
-  }
-
-  /** Update local status badge live based on current form controls. */
   const updateLocalBadge = (): void => {
-    if (!els.localStatus || !els.localBarSel || !els.localBarInput) return
+    if (!localBadge || !compositeKey) return
     const globalSettings = getSettings()
-    const bar = getSchemeField(els.localBarSel, els.localBarInput)
-    const heat = getSchemeField(els.localHeatSel, els.localHeatInput)
-    const div = getSchemeField(els.localDivSel, els.localDivInput)
+    const currentLocal = getGroupSchemeValues(popover, 'local')
 
     const isCustom = Boolean(
-      (compositeKey && getLocalTableSettings(compositeKey)) ||
-        bar !== globalSettings.barColorScheme ||
-        heat !== globalSettings.heatmapColorScheme ||
-        div !== globalSettings.divergingColorScheme,
+      getLocalTableSettings(compositeKey) ||
+        currentLocal.barColorScheme !== globalSettings.barColorScheme ||
+        currentLocal.heatmapColorScheme !==
+          globalSettings.heatmapColorScheme ||
+        currentLocal.divergingColorScheme !==
+          globalSettings.divergingColorScheme,
     )
 
     if (isCustom) {
-      els.localStatus.textContent = 'Custom Override Active'
-      els.localStatus.className = 'b-a-t-settings-badge b-a-t-badge-custom'
+      localBadge.textContent = 'Custom Override Active'
+      localBadge.className = 'b-a-t-settings-badge b-a-t-badge-custom'
     } else {
-      els.localStatus.textContent = 'Using Global Defaults'
-      els.localStatus.className = 'b-a-t-settings-badge b-a-t-badge-global'
+      localBadge.textContent = 'Using Global Defaults'
+      localBadge.className = 'b-a-t-settings-badge b-a-t-badge-global'
     }
   }
 
-  /** Update whitelist status badge and toggle domain button. */
   const updateWhitelistBadge = (): void => {
-    if (!els.whitelistStatus || !els.whitelistTextarea) return
+    if (!whitelistBadge || !whitelistTextarea) return
     const currentUrl = typeof window !== 'undefined' ? window.location.href : ''
     const currentHost =
       (typeof window !== 'undefined' && window.location.hostname) || 'this page'
-    const rules = els.whitelistTextarea.value.split('\n')
+    const rules = whitelistTextarea.value.split('\n')
     const allowed = isUrlAllowed(currentUrl, rules)
 
     if (allowed) {
-      els.whitelistStatus.textContent = '🟢 Whitelisted'
-      els.whitelistStatus.className = 'b-a-t-settings-badge b-a-t-badge-custom'
-      if (els.toggleDomainBtn) {
-        els.toggleDomainBtn.textContent =
-          `➖ Remove ${currentHost} from Whitelist`
+      whitelistBadge.textContent = '🟢 Whitelisted'
+      whitelistBadge.className = 'b-a-t-settings-badge b-a-t-badge-custom'
+      if (toggleDomainBtn) {
+        toggleDomainBtn.textContent = `➖ Remove ${currentHost} from Whitelist`
       }
     } else {
-      els.whitelistStatus.textContent = '⚪ Not Whitelisted'
-      els.whitelistStatus.className = 'b-a-t-settings-badge b-a-t-badge-global'
-      if (els.toggleDomainBtn) {
-        els.toggleDomainBtn.textContent = `➕ Whitelist ${currentHost}`
+      whitelistBadge.textContent = '⚪ Not Whitelisted'
+      whitelistBadge.className = 'b-a-t-settings-badge b-a-t-badge-global'
+      if (toggleDomainBtn) {
+        toggleDomainBtn.textContent = `➕ Whitelist ${currentHost}`
       }
     }
   }
 
-  /** Live preview updates for Local tab. */
   const triggerLivePreviewLocal = (): void => {
-    if (!compositeKey || !els.localBarSel || !els.localBarInput) return
-    const bar = getSchemeField(els.localBarSel, els.localBarInput)
-    const heat = getSchemeField(els.localHeatSel, els.localHeatInput)
-    const div = getSchemeField(els.localDivSel, els.localDivInput)
-    setLocalTableSettings(compositeKey, {
-      barColorScheme: bar,
-      heatmapColorScheme: heat,
-      divergingColorScheme: div,
-    })
+    if (!compositeKey) return
+    const values = getGroupSchemeValues(popover, 'local')
+    setLocalTableSettings(compositeKey, values)
     updateLocalBadge()
     onUpdate()
   }
 
-  /** Live preview updates for Global tab. */
   const triggerLivePreviewGlobal = (): void => {
-    const chartOp = parseFloat(els.globalChartOpacity.value)
-    const btnOp = parseFloat(els.globalButtonOpacity.value)
+    const chartOpInput = popover.querySelector<HTMLInputElement>(
+      'input[name="chartOpacity"]',
+    )
+    const btnOpInput = popover.querySelector<HTMLInputElement>(
+      'input[name="buttonOpacity"]',
+    )
+    const autoVisSelect = popover.querySelector<HTMLSelectElement>(
+      'select[name="autoVisualize"]',
+    )
+    const incIntCheckbox = popover.querySelector<HTMLInputElement>(
+      'input[name="includeAllIntegerColumns"]',
+    )
+    const incSciCheckbox = popover.querySelector<HTMLInputElement>(
+      'input[name="includeScientificNotation"]',
+    )
+
+    const chartOp = chartOpInput ? parseFloat(chartOpInput.value) : NaN
+    const btnOp = btnOpInput ? parseFloat(btnOpInput.value) : NaN
+    const schemes = getGroupSchemeValues(popover, '')
+
     const draftGlobal: Partial<Settings> = {
-      autoVisualize: els.globalAutoVis.value as AutoVisualizeMode,
-      barColorScheme: getSchemeField(els.globalBarSel, els.globalBarInput),
-      heatmapColorScheme: getSchemeField(
-        els.globalHeatSel,
-        els.globalHeatInput,
-      ),
-      divergingColorScheme: getSchemeField(
-        els.globalDivSel,
-        els.globalDivInput,
-      ),
+      autoVisualize: (autoVisSelect?.value as AutoVisualizeMode) ||
+        DEFAULT_SETTINGS.autoVisualize,
+      ...schemes,
       chartOpacity: isNaN(chartOp) ? DEFAULT_SETTINGS.chartOpacity : chartOp,
       buttonOpacity: isNaN(btnOp) ? DEFAULT_SETTINGS.buttonOpacity : btnOp,
-      includeAllIntegerColumns: els.globalIncInt.checked,
-      includeScientificNotation: els.globalIncSci.checked,
+      includeAllIntegerColumns: Boolean(incIntCheckbox?.checked),
+      includeScientificNotation: Boolean(incSciCheckbox?.checked),
     }
+
     updateSettings(draftGlobal)
     updateLocalBadge()
     onUpdate()
   }
 
-  /** Populate all form fields from current settings state. */
   const populateFields = (): void => {
     const globalSettings = getSettings()
-    const effective = getEffectiveSettings(compositeKey)
 
     // Local tab fields
     if (compositeKey) {
-      setSchemeField(
-        els.localBarSel,
-        els.localBarInput,
-        effective.barColorScheme,
-      )
-      setSchemeField(
-        els.localHeatSel,
-        els.localHeatInput,
-        effective.heatmapColorScheme,
-      )
-      setSchemeField(
-        els.localDivSel,
-        els.localDivInput,
-        effective.divergingColorScheme,
-      )
+      const effective = getEffectiveSettings(compositeKey)
+      setGroupSchemeValues(popover, effective, 'local')
       updateLocalBadge()
     }
 
     // Global tab fields
-    els.globalAutoVis.value = globalSettings.autoVisualize
-    setSchemeField(
-      els.globalBarSel,
-      els.globalBarInput,
-      globalSettings.barColorScheme,
+    setGroupSchemeValues(popover, globalSettings, '')
+    const autoVisSelect = popover.querySelector<HTMLSelectElement>(
+      'select[name="autoVisualize"]',
     )
-    setSchemeField(
-      els.globalHeatSel,
-      els.globalHeatInput,
-      globalSettings.heatmapColorScheme,
+    if (autoVisSelect) autoVisSelect.value = globalSettings.autoVisualize
+
+    const chartOpInput = popover.querySelector<HTMLInputElement>(
+      'input[name="chartOpacity"]',
     )
-    setSchemeField(
-      els.globalDivSel,
-      els.globalDivInput,
-      globalSettings.divergingColorScheme,
+    if (chartOpInput) {
+      chartOpInput.value = globalSettings.chartOpacity.toString()
+    }
+
+    const btnOpInput = popover.querySelector<HTMLInputElement>(
+      'input[name="buttonOpacity"]',
     )
-    els.globalChartOpacity.value = globalSettings.chartOpacity.toString()
-    els.globalButtonOpacity.value = globalSettings.buttonOpacity.toString()
-    els.globalIncInt.checked = globalSettings.includeAllIntegerColumns
-    els.globalIncSci.checked = globalSettings.includeScientificNotation
+    if (btnOpInput) {
+      btnOpInput.value = globalSettings.buttonOpacity.toString()
+    }
+
+    const incIntCheckbox = popover.querySelector<HTMLInputElement>(
+      'input[name="includeAllIntegerColumns"]',
+    )
+    if (incIntCheckbox) {
+      incIntCheckbox.checked = globalSettings.includeAllIntegerColumns
+    }
+
+    const incSciCheckbox = popover.querySelector<HTMLInputElement>(
+      'input[name="includeScientificNotation"]',
+    )
+    if (incSciCheckbox) {
+      incSciCheckbox.checked = globalSettings.includeScientificNotation
+    }
 
     // Whitelist tab fields
-    if (els.whitelistTextarea) {
-      els.whitelistTextarea.value = (
+    if (whitelistTextarea) {
+      whitelistTextarea.value = (
         globalSettings.urlWhitelist ?? DEFAULT_WHITELIST
       ).join('\n')
       updateWhitelistBadge()
     }
   }
 
-  // --- Initialize ---
+  // --- Initial population ---
   populateFields()
 
-  // --- Live preview event listeners ---
+  // --- Live Preview & Input Event Bindings ---
 
-  // Local tab input changes
-  if (els.localBarSel && els.localHeatSel) {
-    const handleLocalChange = () => {
-      triggerLivePreviewLocal()
-    }
-    els.localBarSel.addEventListener('change', handleLocalChange)
-    els.localBarInput?.addEventListener('input', handleLocalChange)
-    els.localHeatSel.addEventListener('change', handleLocalChange)
-    els.localHeatInput?.addEventListener('input', handleLocalChange)
-    els.localDivSel?.addEventListener('change', handleLocalChange)
-    els.localDivInput?.addEventListener('input', handleLocalChange)
-  }
-
-  // Global tab input changes
-  const handleGlobalChange = () => {
-    triggerLivePreviewGlobal()
-  }
-  els.globalAutoVis.addEventListener('change', handleGlobalChange)
-  els.globalBarSel.addEventListener('change', handleGlobalChange)
-  els.globalBarInput.addEventListener('input', handleGlobalChange)
-  els.globalHeatSel.addEventListener('change', handleGlobalChange)
-  els.globalHeatInput.addEventListener('input', handleGlobalChange)
-  els.globalDivSel.addEventListener('change', handleGlobalChange)
-  els.globalDivInput.addEventListener('input', handleGlobalChange)
-  els.globalChartOpacity.addEventListener('input', handleGlobalChange)
-  els.globalChartOpacity.addEventListener('change', handleGlobalChange)
-  els.globalButtonOpacity.addEventListener('input', handleGlobalChange)
-  els.globalButtonOpacity.addEventListener('change', handleGlobalChange)
-  els.globalIncInt.addEventListener('change', handleGlobalChange)
-  els.globalIncSci.addEventListener('change', handleGlobalChange)
-
-  // Whitelist textarea live change
-  if (els.whitelistTextarea) {
-    els.whitelistTextarea.addEventListener('input', () => {
-      updateWhitelistBadge()
-    })
-  }
-
-  // Show/hide custom text input on select change
-  qa('select').forEach((sel) => {
-    sel.addEventListener('change', (e) => {
-      const target = e.target as HTMLSelectElement
-      const customInput = popover.querySelector(
-        `[data-custom-input="${target.name}"]`,
-      ) as HTMLElement | null
+  popover.querySelectorAll<HTMLSelectElement>('select').forEach((sel) => {
+    sel.addEventListener('change', () => {
+      const customInput = popover.querySelector<HTMLElement>(
+        `input[data-custom-input="${sel.name}"]`,
+      )
       if (customInput) {
-        if (target.value === 'custom') {
-          customInput.classList.add('active')
-        } else {
-          customInput.classList.remove('active')
-        }
+        customInput.classList.toggle('active', sel.value === 'custom')
+      }
+      const panel = sel.closest('[data-panel]')?.getAttribute('data-panel')
+      if (panel === 'local') {
+        triggerLivePreviewLocal()
+      } else if (panel === 'global') {
+        triggerLivePreviewGlobal()
       }
     })
   })
 
-  // Delegated click handler for tabs and action buttons
+  popover
+    .querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea')
+    .forEach((input) => {
+      const handler = () => {
+        const panel = input.closest('[data-panel]')?.getAttribute('data-panel')
+        if (panel === 'local') {
+          triggerLivePreviewLocal()
+        } else if (panel === 'global') {
+          triggerLivePreviewGlobal()
+        } else if (panel === 'whitelist') {
+          updateWhitelistBadge()
+        }
+      }
+      input.addEventListener('input', handler)
+      input.addEventListener('change', handler)
+    })
+
+  // Delegated click handler for tabs and actions
   popover.addEventListener('click', (e) => {
     const target = e.target as HTMLElement
 
     // Tab switching
-    if (target.dataset.tab) {
-      const tabName = target.dataset.tab
-      els.tabs.forEach((t) =>
+    const tabEl = target.closest<HTMLElement>('[data-tab]')
+    if (tabEl) {
+      const tabName = tabEl.dataset.tab
+      popover.querySelectorAll<HTMLElement>('[data-tab]').forEach((t) => {
         t.classList.toggle('active', t.dataset.tab === tabName)
-      )
-      els.panels.forEach((p) =>
+      })
+      popover.querySelectorAll<HTMLElement>('[data-panel]').forEach((p) => {
         p.classList.toggle('active', p.dataset.panel === tabName)
-      )
+      })
       return
     }
 
-    // Footer & other actions
+    // Actions
     const action = target.closest('[data-action]')?.getAttribute('data-action')
     if (!action) return
 
@@ -860,15 +863,9 @@ export function toggleSettingsPopover(
         break
 
       case 'apply': {
-        const bar = getSchemeField(els.localBarSel, els.localBarInput)
-        const heat = getSchemeField(els.localHeatSel, els.localHeatInput)
-        const div = getSchemeField(els.localDivSel, els.localDivInput)
         if (compositeKey) {
-          setLocalTableSettings(compositeKey, {
-            barColorScheme: bar,
-            heatmapColorScheme: heat,
-            divergingColorScheme: div,
-          })
+          const values = getGroupSchemeValues(popover, 'local')
+          setLocalTableSettings(compositeKey, values)
         }
         isSaved = true
         onUpdate()
@@ -886,26 +883,38 @@ export function toggleSettingsPopover(
       }
 
       case 'save-global': {
-        const chartOp = parseFloat(els.globalChartOpacity.value)
-        const btnOp = parseFloat(els.globalButtonOpacity.value)
+        const chartOpInput = popover.querySelector<HTMLInputElement>(
+          'input[name="chartOpacity"]',
+        )
+        const btnOpInput = popover.querySelector<HTMLInputElement>(
+          'input[name="buttonOpacity"]',
+        )
+        const autoVisSelect = popover.querySelector<HTMLSelectElement>(
+          'select[name="autoVisualize"]',
+        )
+        const incIntCheckbox = popover.querySelector<HTMLInputElement>(
+          'input[name="includeAllIntegerColumns"]',
+        )
+        const incSciCheckbox = popover.querySelector<HTMLInputElement>(
+          'input[name="includeScientificNotation"]',
+        )
+
+        const chartOp = chartOpInput ? parseFloat(chartOpInput.value) : NaN
+        const btnOp = btnOpInput ? parseFloat(btnOpInput.value) : NaN
+        const schemes = getGroupSchemeValues(popover, '')
+
         const newSettings: Partial<Settings> = {
-          autoVisualize: els.globalAutoVis.value as AutoVisualizeMode,
-          barColorScheme: getSchemeField(els.globalBarSel, els.globalBarInput),
-          heatmapColorScheme: getSchemeField(
-            els.globalHeatSel,
-            els.globalHeatInput,
-          ),
-          divergingColorScheme: getSchemeField(
-            els.globalDivSel,
-            els.globalDivInput,
-          ),
+          autoVisualize: (autoVisSelect?.value as AutoVisualizeMode) ||
+            DEFAULT_SETTINGS.autoVisualize,
+          ...schemes,
           chartOpacity: isNaN(chartOp)
             ? DEFAULT_SETTINGS.chartOpacity
             : chartOp,
           buttonOpacity: isNaN(btnOp) ? DEFAULT_SETTINGS.buttonOpacity : btnOp,
-          includeAllIntegerColumns: els.globalIncInt.checked,
-          includeScientificNotation: els.globalIncSci.checked,
+          includeAllIntegerColumns: Boolean(incIntCheckbox?.checked),
+          includeScientificNotation: Boolean(incSciCheckbox?.checked),
         }
+
         updateSettings(newSettings)
         isSaved = true
         onUpdate()
@@ -921,43 +930,43 @@ export function toggleSettingsPopover(
       }
 
       case 'toggle-current-domain': {
-        if (!els.whitelistTextarea) break
+        if (!whitelistTextarea) break
         const currentUrl = typeof window !== 'undefined'
           ? window.location.href
           : ''
         const currentHost =
           (typeof window !== 'undefined' && window.location.hostname) || ''
-        const lines = els.whitelistTextarea.value.split('\n')
+        const lines = whitelistTextarea.value.split('\n')
         const allowed = isUrlAllowed(currentUrl, lines)
         if (allowed) {
           // Comment out rules that match the current URL
           const commented = lines.map((l) =>
             matchesRule(currentUrl, l) ? `# ${l}` : l
           )
-          els.whitelistTextarea.value = commented.join('\n')
+          whitelistTextarea.value = commented.join('\n')
         } else {
           // Add current domain rule
           const newRule = currentHost
             ? (currentHost.includes('.') ? `*://${currentHost}/*` : currentHost)
             : currentUrl
-          const val = els.whitelistTextarea.value.trim()
-          els.whitelistTextarea.value = val ? `${val}\n${newRule}` : newRule
+          const val = whitelistTextarea.value.trim()
+          whitelistTextarea.value = val ? `${val}\n${newRule}` : newRule
         }
         updateWhitelistBadge()
         break
       }
 
       case 'reset-whitelist': {
-        if (els.whitelistTextarea) {
-          els.whitelistTextarea.value = DEFAULT_WHITELIST.join('\n')
+        if (whitelistTextarea) {
+          whitelistTextarea.value = DEFAULT_WHITELIST.join('\n')
           updateWhitelistBadge()
         }
         break
       }
 
       case 'save-whitelist': {
-        if (els.whitelistTextarea) {
-          const rules = els.whitelistTextarea.value
+        if (whitelistTextarea) {
+          const rules = whitelistTextarea.value
             .split('\n')
             .map((s) => s.trim())
             .filter(Boolean)
@@ -971,7 +980,7 @@ export function toggleSettingsPopover(
     }
   })
 
-  // Close when clicking outside
+  // Close when clicking outside or pressing Escape
   setTimeout(() => {
     closeHandler = (e: MouseEvent) => {
       if (
