@@ -67,48 +67,155 @@ function cssOnce(): void {
   const style = document.createElement('style')
   style.id = 'b-a-t-settings-styles'
   style.textContent = `
+    :root {
+      --bat-bg: #ffffff;
+      --bat-text: #18181b;
+      --bat-text-muted: #71717a;
+      --bat-header-bg: #f4f4f5;
+      --bat-border: #e4e4e7;
+      --bat-border-input: #d4d4d8;
+      --bat-border-group: #e4e4e7;
+      --bat-tab-inactive-bg: #f4f4f5;
+      --bat-tab-inactive-text: #71717a;
+      --bat-tab-active-bg: #ffffff;
+      --bat-tab-active-text: #18181b;
+      --bat-tab-active-border: #18181b;
+      --bat-input-bg: #ffffff;
+      --bat-input-text: #18181b;
+      --bat-btn-bg: #f4f4f5;
+      --bat-btn-hover: #e4e4e7;
+      --bat-btn-text: #18181b;
+      --bat-btn-border: #d4d4d8;
+      --bat-btn-primary-bg: #18181b;
+      --bat-btn-primary-hover: #27272a;
+      --bat-btn-primary-text: #ffffff;
+      --bat-btn-primary-border: #18181b;
+      --bat-badge-global-bg: #f4f4f5;
+      --bat-badge-global-text: #3f3f46;
+      --bat-badge-custom-bg: #e4e4e7;
+      --bat-badge-custom-text: #18181b;
+      --bat-close-btn: #71717a;
+      --bat-close-btn-hover: #18181b;
+      --bat-shadow: 0 4px 12px rgba(0,0,0,0.12);
+      --bat-color-scheme: light;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bat-bg: #18181b;
+        --bat-text: #f4f4f5;
+        --bat-text-muted: #a1a1aa;
+        --bat-header-bg: #09090b;
+        --bat-border: #27272a;
+        --bat-border-input: #3f3f46;
+        --bat-border-group: #27272a;
+        --bat-tab-inactive-bg: #09090b;
+        --bat-tab-inactive-text: #a1a1aa;
+        --bat-tab-active-bg: #18181b;
+        --bat-tab-active-text: #fafafa;
+        --bat-tab-active-border: #fafafa;
+        --bat-input-bg: #27272a;
+        --bat-input-text: #f4f4f5;
+        --bat-btn-bg: #27272a;
+        --bat-btn-hover: #3f3f46;
+        --bat-btn-text: #f4f4f5;
+        --bat-btn-border: #3f3f46;
+        --bat-btn-primary-bg: #fafafa;
+        --bat-btn-primary-hover: #e4e4e7;
+        --bat-btn-primary-text: #18181b;
+        --bat-btn-primary-border: #fafafa;
+        --bat-badge-global-bg: #27272a;
+        --bat-badge-global-text: #d4d4d8;
+        --bat-badge-custom-bg: #3f3f46;
+        --bat-badge-custom-text: #fafafa;
+        --bat-close-btn: #a1a1aa;
+        --bat-close-btn-hover: #fafafa;
+        --bat-shadow: 0 4px 16px rgba(0,0,0,0.5);
+        --bat-color-scheme: dark;
+      }
+    }
+
+    [data-theme="dark"],
+    [data-color-mode="dark"],
+    .dark,
+    .dark-mode,
+    html.theme-dark {
+      --bat-bg: #18181b;
+      --bat-text: #f4f4f5;
+      --bat-text-muted: #a1a1aa;
+      --bat-header-bg: #09090b;
+      --bat-border: #27272a;
+      --bat-border-input: #3f3f46;
+      --bat-border-group: #27272a;
+      --bat-tab-inactive-bg: #09090b;
+      --bat-tab-inactive-text: #a1a1aa;
+      --bat-tab-active-bg: #18181b;
+      --bat-tab-active-text: #fafafa;
+      --bat-tab-active-border: #fafafa;
+      --bat-input-bg: #27272a;
+      --bat-input-text: #f4f4f5;
+      --bat-btn-bg: #27272a;
+      --bat-btn-hover: #3f3f46;
+      --bat-btn-text: #f4f4f5;
+      --bat-btn-border: #3f3f46;
+      --bat-btn-primary-bg: #fafafa;
+      --bat-btn-primary-hover: #e4e4e7;
+      --bat-btn-primary-text: #18181b;
+      --bat-btn-primary-border: #fafafa;
+      --bat-badge-global-bg: #27272a;
+      --bat-badge-global-text: #d4d4d8;
+      --bat-badge-custom-bg: #3f3f46;
+      --bat-badge-custom-text: #fafafa;
+      --bat-close-btn: #a1a1aa;
+      --bat-close-btn-hover: #fafafa;
+      --bat-shadow: 0 4px 16px rgba(0,0,0,0.5);
+      --bat-color-scheme: dark;
+    }
+
     .b-a-t-settings-popover {
       z-index: 10000;
       width: 360px;
-      background: white;
-      border: 1px solid #ccc;
+      background: var(--bat-bg);
+      border: 1px solid var(--bat-border);
       border-radius: 6px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      box-shadow: var(--bat-shadow);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-size: 13px;
-      color: #333;
+      color: var(--bat-text);
+      color-scheme: var(--bat-color-scheme);
       margin-top: 8px;
     }
     .b-a-t-settings-header {
-      background: #f8f9fa;
+      background: var(--bat-header-bg);
       padding: 10px 15px;
-      border-bottom: 1px solid #e9ecef;
+      border-bottom: 1px solid var(--bat-border);
       display: flex;
       justify-content: space-between;
       align-items: center;
       border-radius: 6px 6px 0 0;
       font-weight: bold;
+      color: var(--bat-text);
       cursor: grab;
       user-select: none;
     }
     .b-a-t-settings-tabs {
       display: flex;
-      border-bottom: 1px solid #e9ecef;
+      border-bottom: 1px solid var(--bat-border);
     }
     .b-a-t-settings-tab {
       padding: 8px 12px;
       cursor: pointer;
       flex: 1;
       text-align: center;
-      background: #f8f9fa;
+      background: var(--bat-tab-inactive-bg);
       border-bottom: 2px solid transparent;
-      color: #666;
+      color: var(--bat-tab-inactive-text);
       font-size: 12px;
     }
     .b-a-t-settings-tab.active {
-      background: white;
-      border-bottom-color: #495057;
-      color: #212529;
+      background: var(--bat-tab-active-bg);
+      border-bottom-color: var(--bat-tab-active-border);
+      color: var(--bat-tab-active-text);
       font-weight: 500;
     }
     .b-a-t-settings-panel {
@@ -124,8 +231,8 @@ function cssOnce(): void {
     .b-a-t-settings-group-title {
       font-weight: 600;
       margin-bottom: 10px;
-      color: #444;
-      border-bottom: 1px solid #eee;
+      color: var(--bat-text);
+      border-bottom: 1px solid var(--bat-border-group);
       padding-bottom: 4px;
     }
     .b-a-t-settings-field {
@@ -136,22 +243,28 @@ function cssOnce(): void {
     .b-a-t-settings-field label {
       margin-bottom: 4px;
       font-weight: 500;
+      color: var(--bat-text);
     }
     .b-a-t-settings-field select,
     .b-a-t-settings-field input[type="text"],
     .b-a-t-settings-field input[type="number"] {
       width: 100%;
       padding: 6px;
-      border: 1px solid #d1d5da;
+      background: var(--bat-input-bg);
+      color: var(--bat-input-text);
+      border: 1px solid var(--bat-border-input);
       border-radius: 4px;
       box-sizing: border-box;
       font-size: 13px;
+      color-scheme: var(--bat-color-scheme);
     }
     .b-a-t-settings-textarea {
       width: 100%;
       height: 120px;
       padding: 6px 8px;
-      border: 1px solid #d1d5da;
+      background: var(--bat-input-bg);
+      color: var(--bat-input-text);
+      border: 1px solid var(--bat-border-input);
       border-radius: 4px;
       box-sizing: border-box;
       font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
@@ -159,17 +272,24 @@ function cssOnce(): void {
       resize: vertical;
       line-height: 1.4;
       white-space: pre;
+      color-scheme: var(--bat-color-scheme);
     }
     .b-a-t-help-text {
       font-size: 11px;
-      color: #6c757d;
+      color: var(--bat-text-muted);
       margin-top: 5px;
       line-height: 1.35;
+    }
+    .b-a-t-help-text code {
+      background: var(--bat-tab-inactive-bg);
+      padding: 1px 4px;
+      border-radius: 3px;
     }
     .b-a-t-settings-field-checkbox {
       display: flex;
       align-items: center;
       margin-bottom: 8px;
+      color: var(--bat-text);
     }
     .b-a-t-settings-field-checkbox input {
       margin-right: 8px;
@@ -180,27 +300,28 @@ function cssOnce(): void {
       gap: 10px;
       margin-top: 15px;
       padding-top: 15px;
-      border-top: 1px solid #eaecef;
+      border-top: 1px solid var(--bat-border);
     }
     .b-a-t-btn {
       padding: 6px 12px;
       cursor: pointer;
-      border: 1px solid #d1d5da;
-      background: #fafbfc;
+      border: 1px solid var(--bat-btn-border);
+      background: var(--bat-btn-bg);
+      color: var(--bat-btn-text);
       border-radius: 4px;
       font-size: 13px;
       font-weight: 500;
     }
     .b-a-t-btn:hover {
-      background: #f3f4f6;
+      background: var(--bat-btn-hover);
     }
     .b-a-t-btn-primary {
-      background: #495057;
-      color: white;
-      border-color: #495057;
+      background: var(--bat-btn-primary-bg);
+      color: var(--bat-btn-primary-text);
+      border-color: var(--bat-btn-primary-border);
     }
     .b-a-t-btn-primary:hover {
-      background: #343a40;
+      background: var(--bat-btn-primary-hover);
     }
     .b-a-t-settings-badge {
       display: inline-block;
@@ -211,12 +332,12 @@ function cssOnce(): void {
       margin-bottom: 12px;
     }
     .b-a-t-badge-global {
-      background: #f1f3f5;
-      color: #495057;
+      background: var(--bat-badge-global-bg);
+      color: var(--bat-badge-global-text);
     }
     .b-a-t-badge-custom {
-      background: #e9ecef;
-      color: #343a40;
+      background: var(--bat-badge-custom-bg);
+      color: var(--bat-badge-custom-text);
     }
     .b-a-t-settings-custom-input {
       margin-top: 6px;
@@ -231,11 +352,11 @@ function cssOnce(): void {
       border: none;
       font-size: 18px;
       line-height: 1;
-      color: #6a737d;
+      color: var(--bat-close-btn);
       padding: 0;
     }
     .b-a-t-close-btn:hover {
-      color: #24292e;
+      color: var(--bat-close-btn-hover);
     }
   `
   document.head.appendChild(style)

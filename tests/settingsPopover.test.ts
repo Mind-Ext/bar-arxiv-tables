@@ -535,6 +535,16 @@ describe('Settings Popover UI', () => {
       )
       expect(styles.length).toBe(1)
     })
+
+    it('includes dark mode media queries and CSS custom properties in injected style', () => {
+      toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
+      const style = document.getElementById(
+        'b-a-t-settings-styles',
+      ) as HTMLStyleElement
+      expect(style.textContent).toContain('prefers-color-scheme: dark')
+      expect(style.textContent).toContain('--bat-bg')
+      expect(style.textContent).toContain('--bat-text')
+    })
   })
 
   // -----------------------------------------------------------------------
