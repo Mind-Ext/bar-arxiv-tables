@@ -13,9 +13,11 @@ import {
   CellValue,
   discoverTables,
   expandGrid,
+  extractCellText,
   hasQualifyingNumericColumn,
   isAllIntegerColumn,
   ParsedTable,
+  parseNumeric,
   parseTable,
   sanitizeForParse,
 } from '../src/parser'
@@ -330,5 +332,139 @@ describe('zero-width character removal', () => {
     const table = dom.window.document.querySelector('table') as HTMLTableElement
     const parsed = parseTable(table)
     expect(parsed.colNames[0]).toEqual(['Pdrop'])
+  })
+})
+
+describe('Scientific notation sanitization (sanitizeForParse)', () => {
+  it('normalizes standard e-notation and signs', () => {
+    expect(sanitizeForParse('1.23e-4')).toBe('1.23e-4')
+    expect(sanitizeForParse('5E+3')).toBe('5E+3')
+    expect(sanitizeForParse('-1.5e-2')).toBe('-1.5e-2')
+  })
+
+  it('normalizes LaTeX \\times and \\cdot scientific notation', () => {
+    expect(sanitizeForParse('1.23 \\times 10^{-4}')).toBe('1.23e-4')
+    expect(sanitizeForParse('1.23 \\times 10^{ -4 }')).toBe('1.23e-4')
+    expect(sanitizeForParse('2.5 \\cdot 10^{3}')).toBe('2.5e3')
+    expect(sanitizeForParse('3.14 \\times 10^2')).toBe('3.14e2')
+  })
+
+  it('normalizes Unicode multiplication operators and superscripts', () => {
+    expect(sanitizeForParse('1.23 × 10⁻⁴')).toBe('1.23e-4')
+    expect(sanitizeForParse('2.5 · 10³')).toBe('2.5e3')
+    expect(sanitizeForParse('4.2 ⋅ 10⁺⁵')).toBe('4.2e+5')
+  })
+
+  it('normalizes standalone powers of 10 without mantissa', () => {
+    expect(sanitizeForParse('10^{-5}')).toBe('1e-5')
+    expect(sanitizeForParse('10^4')).toBe('1e4')
+    expect(sanitizeForParse('10⁻⁵')).toBe('1e-5')
+    expect(sanitizeForParse('-10^{-3}')).toBe('-1e-3')
+  })
+
+  it('distributes factored variance notation', () => {
+    expect(sanitizeForParse('(1.23 ± 0.05) \\times 10^{-4}')).toBe(
+      '1.23e-4 ± 0.05e-4',
+    )
+    expect(sanitizeForParse('(1.23 ± 0.05) × 10⁻⁴')).toBe('1.23e-4 ± 0.05e-4')
+    expect(sanitizeForParse('(1.23 \\pm 0.05) \\cdot 10^{3}')).toBe(
+      '1.23e3 ± 0.05e3',
+    )
+    expect(sanitizeForParse('(1.23 ± 0.05)e-4')).toBe('1.23e-4 ± 0.05e-4')
+    expect(sanitizeForParse('(1.23 ± 0.05)E+3')).toBe('1.23e+3 ± 0.05e+3')
+  })
+
+  it('strips LaTeX math delimiters $, ~, and text styles around scientific notation', () => {
+    expect(sanitizeForParse('$1.23 \\times 10^{-4}$')).toBe('1.23e-4')
+    expect(sanitizeForParse('1.23~\\times~10^{-4}')).toBe('1.23e-4')
+    expect(sanitizeForParse('\\mathbf{1.23 \\times 10^{-4}}')).toBe('1.23e-4')
+  })
+})
+
+describe('Scientific notation numeric parsing (parseNumeric)', () => {
+  it('parses scientific notation', () => {
+    expect(parseNumeric('1.23e-4')).toEqual({ value: 0.000123 })
+    expect(parseNumeric('1e-5')).toEqual({ value: 0.00001 })
+    expect(parseNumeric('5E+3')).toEqual({ value: 5000 })
+    expect(parseNumeric('-1.5e-2')).toEqual({ value: -0.015 })
+  })
+
+  it('parses standard numbers', () => {
+    expect(parseNumeric('1.23')).toEqual({ value: 1.23 })
+    expect(parseNumeric('1.23 ± 0.05')).toEqual({
+      value: 1.23,
+      variance: 0.05,
+    })
+    expect(parseNumeric('-45.6')).toEqual({ value: -45.6 })
+  })
+
+  it('parses scientific notation with variance', () => {
+    const result = parseNumeric('1.23e-4 ± 0.02e-4')
+    expect(result.value).toBeCloseTo(0.000123, 8)
+    expect(result.variance).toBeCloseTo(0.000002, 8)
+  })
+})
+
+describe('DOM cell text extraction (extractCellText)', () => {
+  it('converts <sup> elements to ^{...}', () => {
+    const dom = new JSDOM(
+      '<table><tr><td>1.23 × 10<sup>-4</sup></td></tr></table>',
+    )
+    const cell = dom.window.document.querySelector('td') as HTMLTableCellElement
+    expect(extractCellText(cell)).toBe('1.23 × 10^{-4}')
+  })
+
+  it('selectively replaces math[alttext] when containing exponent expressions', () => {
+    const dom = new JSDOM(
+      '<table><tr><td><math alttext="1.23 \\times 10^{-4}"><mrow>...</mrow></math></td></tr></table>',
+    )
+    const cell = dom.window.document.querySelector('td') as HTMLTableCellElement
+    expect(extractCellText(cell)).toBe('1.23 \\times 10^{-4}')
+  })
+
+  it('preserves non-exponent math content without corrupting labels like d_model', () => {
+    const dom = new JSDOM(
+      '<table><tr><th><math alttext="d_{\\text{model}}"><span>d</span><sub>model</sub></math></th></tr></table>',
+    )
+    const cell = dom.window.document.querySelector('th') as HTMLTableCellElement
+    expect(extractCellText(cell)).toBe('dmodel')
+  })
+})
+
+describe('discoverTables with scientific notation', () => {
+  const sciTableHtml = `
+    <table>
+      <thead><tr><th>Model</th><th>Error Rate</th></tr></thead>
+      <tbody>
+        <tr><td>A</td><td>1.23e-4</td></tr>
+        <tr><td>B</td><td>2.45e-4</td></tr>
+        <tr><td>C</td><td>3.67e-4</td></tr>
+      </tbody>
+    </table>
+  `
+
+  it('discovers table with scientific notation', () => {
+    const dom = new JSDOM(sciTableHtml)
+    const candidates = discoverTables(dom.window.document)
+    expect(candidates).toHaveLength(1)
+    expect(candidates[0].parsed.data[0][0].value).toBeCloseTo(0.000123, 7)
+    expect(candidates[0].parsed.data[1][0].value).toBeCloseTo(0.000245, 7)
+    expect(candidates[0].parsed.data[2][0].value).toBeCloseTo(0.000367, 7)
+  })
+
+  it('correctly handles scientific notation integers in isAllIntegerColumn', () => {
+    const intSciData: CellValue[][] = [
+      [{ value: 1e3, isHighlighted: false, raw: '1e3' }],
+      [{ value: 2e4, isHighlighted: false, raw: '2e4' }],
+      [{ value: 5e2, isHighlighted: false, raw: '5e2' }],
+    ]
+    expect(isAllIntegerColumn(intSciData, 0)).toBe(true)
+
+    const floatSciData: CellValue[][] = [
+      [{ value: 1e-3, isHighlighted: false, raw: '1e-3' }],
+      [{ value: 2e-4, isHighlighted: false, raw: '2e-4' }],
+      [{ value: 5e-2, isHighlighted: false, raw: '5e-2' }],
+    ]
+    expect(isAllIntegerColumn(floatSciData, 0)).toBe(false)
   })
 })

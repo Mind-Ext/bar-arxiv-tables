@@ -51,7 +51,6 @@ describe('Settings Management', () => {
       heatmapColorScheme: 'Cividis',
       divergingColorScheme: 'PuOr',
       includeAllIntegerColumns: false,
-      includeScientificNotation: false,
       urlWhitelist: DEFAULT_WHITELIST,
     })
 

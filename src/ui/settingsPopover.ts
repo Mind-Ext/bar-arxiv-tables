@@ -494,11 +494,6 @@ const globalTab: SettingsTab = {
           <input type="checkbox" name="includeAllIntegerColumns" id="cb-int">
           <label for="cb-int">Include All-Integer Columns</label>
         </div>
-
-        <div class="b-a-t-settings-field-checkbox">
-          <input type="checkbox" name="includeScientificNotation" id="cb-sci">
-          <label for="cb-sci">Include Scientific Notation</label>
-        </div>
       </div>
 
       <div class="b-a-t-settings-footer">
@@ -873,9 +868,6 @@ export function toggleSettingsPopover(
     const incIntCheckbox = popover.querySelector<HTMLInputElement>(
       'input[name="includeAllIntegerColumns"]',
     )
-    const incSciCheckbox = popover.querySelector<HTMLInputElement>(
-      'input[name="includeScientificNotation"]',
-    )
 
     const chartOp = chartOpInput ? parseFloat(chartOpInput.value) : NaN
     const btnOp = btnOpInput ? parseFloat(btnOpInput.value) : NaN
@@ -888,7 +880,6 @@ export function toggleSettingsPopover(
       chartOpacity: isNaN(chartOp) ? DEFAULT_SETTINGS.chartOpacity : chartOp,
       buttonOpacity: isNaN(btnOp) ? DEFAULT_SETTINGS.buttonOpacity : btnOp,
       includeAllIntegerColumns: Boolean(incIntCheckbox?.checked),
-      includeScientificNotation: Boolean(incSciCheckbox?.checked),
     }
 
     updateSettings(draftGlobal)
@@ -932,13 +923,6 @@ export function toggleSettingsPopover(
     )
     if (incIntCheckbox) {
       incIntCheckbox.checked = globalSettings.includeAllIntegerColumns
-    }
-
-    const incSciCheckbox = popover.querySelector<HTMLInputElement>(
-      'input[name="includeScientificNotation"]',
-    )
-    if (incSciCheckbox) {
-      incSciCheckbox.checked = globalSettings.includeScientificNotation
     }
 
     // Whitelist tab fields
@@ -1048,9 +1032,6 @@ export function toggleSettingsPopover(
         const incIntCheckbox = popover.querySelector<HTMLInputElement>(
           'input[name="includeAllIntegerColumns"]',
         )
-        const incSciCheckbox = popover.querySelector<HTMLInputElement>(
-          'input[name="includeScientificNotation"]',
-        )
 
         const chartOp = chartOpInput ? parseFloat(chartOpInput.value) : NaN
         const btnOp = btnOpInput ? parseFloat(btnOpInput.value) : NaN
@@ -1065,7 +1046,6 @@ export function toggleSettingsPopover(
             : chartOp,
           buttonOpacity: isNaN(btnOp) ? DEFAULT_SETTINGS.buttonOpacity : btnOp,
           includeAllIntegerColumns: Boolean(incIntCheckbox?.checked),
-          includeScientificNotation: Boolean(incSciCheckbox?.checked),
         }
 
         updateSettings(newSettings)

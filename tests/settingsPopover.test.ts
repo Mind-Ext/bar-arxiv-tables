@@ -430,18 +430,13 @@ describe('Settings Popover UI', () => {
       const intCheckbox = popover.querySelector(
         '[name="includeAllIntegerColumns"]',
       ) as HTMLInputElement
-      const sciCheckbox = popover.querySelector(
-        '[name="includeScientificNotation"]',
-      ) as HTMLInputElement
 
       intCheckbox.checked = true
-      sciCheckbox.checked = true
 
       clickAction('save-global')
 
       const settings = getSettings()
       expect(settings.includeAllIntegerColumns).toBe(true)
-      expect(settings.includeScientificNotation).toBe(true)
     })
 
     it('Reset to Defaults — restores factory settings and calls onUpdate', () => {

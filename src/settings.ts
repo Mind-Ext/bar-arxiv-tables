@@ -54,7 +54,6 @@ export interface Settings {
 
   // Parser Settings
   includeAllIntegerColumns: boolean
-  includeScientificNotation: boolean
 
   // Site Scope & Whitelist
   urlWhitelist: string[]
@@ -74,7 +73,6 @@ export const DEFAULT_SETTINGS: Settings = {
   heatmapColorScheme: 'Cividis',
   divergingColorScheme: 'PuOr',
   includeAllIntegerColumns: false,
-  includeScientificNotation: false,
   urlWhitelist: DEFAULT_WHITELIST,
 }
 
@@ -260,10 +258,6 @@ export function getSettings(): Settings {
       'includeAllIntegerColumns',
       DEFAULT_SETTINGS.includeAllIntegerColumns,
     ),
-    includeScientificNotation: getValue<boolean>(
-      'includeScientificNotation',
-      DEFAULT_SETTINGS.includeScientificNotation,
-    ),
     urlWhitelist: getValue<string[]>(
       'urlWhitelist',
       DEFAULT_SETTINGS.urlWhitelist,
@@ -298,9 +292,6 @@ export function updateSettings(partial: Partial<Settings>): Settings {
   }
   if (partial.includeAllIntegerColumns !== undefined) {
     setValue('includeAllIntegerColumns', updated.includeAllIntegerColumns)
-  }
-  if (partial.includeScientificNotation !== undefined) {
-    setValue('includeScientificNotation', updated.includeScientificNotation)
   }
   if (partial.urlWhitelist !== undefined) {
     setValue('urlWhitelist', updated.urlWhitelist)

@@ -93,7 +93,7 @@
       "hasSd": false
     },
     {
-      "colName": ["params", "× 10 6"],
+      "colName": ["params", "\\times 10^{6}"],
       "min": 28,
       "max": 213,
       "nullCount": 9,

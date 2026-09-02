@@ -160,7 +160,9 @@ export function detectHeaders(
     const row = grid[r]
     const allTh = row.every((c) => c === null || c.isHeader)
     const noneNumeric = row.every(
-      (c) => c === null || !isNumericString(sanitizeForParse(c.text)),
+      (c) =>
+        c === null ||
+        !isNumericString(sanitizeForParse(c.text)),
     )
     if (allTh || noneNumeric) {
       topNonNumRows = r + 1
@@ -178,7 +180,11 @@ export function detectHeaders(
       const cell = grid[r][c]
       if (cell === null) continue
       if (!cell.isHeader) allTh = false
-      if (isNumericString(sanitizeForParse(cell.text))) noneNumeric = false
+      if (
+        isNumericString(sanitizeForParse(cell.text))
+      ) {
+        noneNumeric = false
+      }
     }
     if (allTh || noneNumeric) {
       leftNonNumCols = c + 1
@@ -257,13 +263,26 @@ export function extractRowNames(
 // 4c. Body Extraction & Sanitization
 // ---------------------------------------------------------------------------
 
+const SUPERSCRIPT_MAP: Record<string, string> = {
+  '⁰': '0',
+  '¹': '1',
+  '²': '2',
+  '³': '3',
+  '⁴': '4',
+  '⁵': '5',
+  '⁶': '6',
+  '⁷': '7',
+  '⁸': '8',
+  '⁹': '9',
+  '⁺': '+',
+  '⁻': '-',
+  '¯': '-',
+}
+
 /**
  * Sanitize a raw cell string for numeric parsing.
- * Strips LaTeX, HTML artifacts, special symbols, etc.
- */
-/**
- * Sanitize a raw cell string for numeric parsing.
- * Strips LaTeX, HTML artifacts, special symbols, etc.
+ * Strips LaTeX, HTML artifacts, special symbols, etc., and normalizes
+ * scientific notation into standard `1.23e-4` or `1.23e-4 ± 0.05e-4`.
  */
 export function sanitizeForParse(raw: string): string {
   let s = raw
@@ -271,31 +290,69 @@ export function sanitizeForParse(raw: string): string {
   s = s.replace(/[\u200B-\u200D\uFEFF]/g, '')
   // Replace Unicode minus signs and dashes with ASCII '-'
   s = s.replace(/[\u2212\u2010\u2011\u2012\u2013\u2014]/g, '-')
-  // Remove HTML tags (leftover from textContent shouldn't have many,
-  // but just in case)
+  // Replace LaTeX non-breaking spaces (~) with standard space
+  s = s.replace(/~/g, ' ')
+
+  // Normalize Unicode superscripts: 10⁻⁴ -> 10^{-4}
+  s = s.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻¯]+/g, (match) => {
+    const digits = match
+      .split('')
+      .map((ch) => SUPERSCRIPT_MAP[ch] ?? ch)
+      .join('')
+    return `^{${digits}}`
+  })
+
+  // Distribute factored variance: (1.23 ± 0.05) × 10^{-4} or (1.23 ± 0.05)e-4 -> 1.23e-4 ± 0.05e-4
+  s = s.replace(
+    /\(\s*([^±()]+)\s*(?:±|\\pm|&plusmn;|\u00b1)\s*([^±()]+)\s*\)\s*(?:(?:\\times|\\cdot|[×·⋅])\s*10\s*(?:\^\{\s*([+-]?\s*\d+)\s*\}|\^\(?\s*([+-]?\s*\d+)\s*\)?)|[eE]([+-]?\d+))/g,
+    (_, val, varVal, exp1, exp2, exp3) => {
+      const exp = (exp1 || exp2 || exp3 || '').replace(/\s+/g, '')
+      return `${val.trim()}e${exp} ± ${varVal.trim()}e${exp}`
+    },
+  )
+
+  // Single scientific notation: 1.23 \times 10^{-4} -> 1.23e-4
+  s = s.replace(
+    /\s*(?:\\times|\\cdot|[×·⋅])\s*10\s*(?:\^\{\s*([+-]?\s*\d+)\s*\}|\^\(?\s*([+-]?\s*\d+)\s*\)?)/g,
+    (_, exp1, exp2) => {
+      const exp = (exp1 || exp2 || '').replace(/\s+/g, '')
+      return `e${exp}`
+    },
+  )
+
+  // Standalone power of 10: 10^{-4} -> 1e-4
+  s = s.replace(
+    /(^|[^\d.eE])10\s*(?:\^\{\s*([+-]?\s*\d+)\s*\}|\^\(?\s*([+-]?\s*\d+)\s*\)?)/g,
+    (_, prefix, exp1, exp2) => {
+      const exp = (exp1 || exp2 || '').replace(/\s+/g, '')
+      return `${prefix}1e${exp}`
+    },
+  )
+
+  // Remove HTML tags (leftover from textContent shouldn't have many, but just in case)
   s = s.replace(/<[^>]+>/g, '')
-  // Remove LaTeX commands: \textbf{}, \mathbf{}, \underline{}, etc.
+  // Remove LaTeX formatting commands: \textbf{}, \mathbf{}, \underline{}, etc.
   s = s.replace(
     /\\(?:textbf|mathbf|textit|mathit|underline|textsc|mathrm)\{([^}]*)\}/g,
     '$1',
   )
   // Remove remaining backslash commands without braces
   s = s.replace(/\\[a-zA-Z]+/g, '')
-  // Strip %, ‰, †, ‡, *, superscript markers
-  s = s.replace(/[%‰†‡*]/g, '')
+  // Strip wrapping LaTeX math delimiters $…$
+  s = s.replace(/\$(.*?)\$/g, '$1')
+  // Strip %, ‰, †, ‡ superscript markers
+  s = s.replace(/[%‰†‡]/g, '')
   // Collapse whitespace
   s = s.replace(/\s+/g, ' ').trim()
+  // Collapse whitespace around scientific 'e' / 'E' (e.g. "1.23 e-4" -> "1.23e-4")
+  s = s.replace(/(?<=\d|\.)\s+([eE])/g, '$1')
   // Remove space between sign and number (e.g. "- 0.0297" -> "-0.0297")
   s = s.replace(/([+-])\s+(?=\d)/g, '$1')
   return s
 }
 
-/** Regex to parse a numeric value with optional ± variance. */
-const NUMERIC_RE =
-  /^([+-]?\d+(?:\.\d+)?)\s*(?:±|\\pm|&plusmn;|\u00b1)\s*(\d+(?:\.\d+)?)$/
-
-/** Regex for a plain number (int or float). */
-const PLAIN_NUMBER_RE = /^[+-]?\d+(?:\.\d+)?$/
+/** Matches a valid floating-point number with optional scientific exponent */
+const NUMBER_RE = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/
 
 /**
  * Parse a sanitized string into a value + optional variance.
@@ -306,18 +363,22 @@ export function parseNumeric(sanitized: string): {
 } {
   if (!sanitized) return { value: null }
 
-  // Try value ± variance first
-  const m = NUMERIC_RE.exec(sanitized)
-  if (m) {
-    return {
-      value: parseFloat(m[1]),
-      variance: parseFloat(m[2]),
+  // Split on variance separator (±, \pm, etc.)
+  const parts = sanitized.split(/\s*(?:±|\\pm|&plusmn;|\u00b1)\s*/)
+  if (parts.length > 2) return { value: null }
+
+  if (parts.length === 2) {
+    if (NUMBER_RE.test(parts[0]) && NUMBER_RE.test(parts[1])) {
+      return {
+        value: parseFloat(parts[0]),
+        variance: parseFloat(parts[1]),
+      }
     }
+    return { value: null }
   }
 
-  // Try plain number
-  if (PLAIN_NUMBER_RE.test(sanitized)) {
-    return { value: parseFloat(sanitized) }
+  if (NUMBER_RE.test(parts[0])) {
+    return { value: parseFloat(parts[0]) }
   }
 
   return { value: null }
@@ -514,7 +575,8 @@ function getDirectRows(table: HTMLTableElement): HTMLTableRowElement[] {
 }
 
 /** Extract cleaned text from a cell, ignoring nested tables. */
-function extractCellText(cell: HTMLTableCellElement): string {
+export function extractCellText(cell: HTMLTableCellElement): string {
+  if (!cell) return ''
   // Clone node, remove nested tables, then get textContent
   const clone = cell.cloneNode(true) as HTMLTableCellElement
   for (const nested of Array.from(clone.querySelectorAll('table'))) {
@@ -528,6 +590,25 @@ function extractCellText(cell: HTMLTableCellElement): string {
   ) {
     ann.remove()
   }
+
+  // Preserve <sup> and .ltx_sup exponents
+  for (const sup of Array.from(clone.querySelectorAll('sup, .ltx_sup'))) {
+    sup.textContent = `^{${sup.textContent || ''}}`
+  }
+
+  // Selective alttext: only if it contains scientific/power expressions
+  for (const math of Array.from(clone.querySelectorAll('math[alttext]'))) {
+    const alt = math.getAttribute('alttext') || ''
+    if (
+      /(?:\\times|\\cdot|[×·⋅])\s*10\s*\^|10\s*\^\s*\{?\s*[+-]?\s*\d+\s*\}?/
+        .test(
+          alt,
+        )
+    ) {
+      math.textContent = ` ${alt} `
+    }
+  }
+
   return (clone.textContent || '')
     .replace(/[\u200B-\u200D\uFEFF]/g, '')
     .replace(/\s+/g, ' ')
