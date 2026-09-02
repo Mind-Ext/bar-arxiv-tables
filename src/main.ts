@@ -181,13 +181,17 @@ function handleSettings(
 }
 
 function processPage(): void {
-  const candidates = discoverTables()
+  const currentSettings = getSettings()
+  const candidates = discoverTables(
+    document,
+    currentSettings.includeAllIntegerColumns,
+  )
   console.log(`[arXiv-Charts] Found ${candidates.length} candidate table(s).`)
 
   injectButtons(candidates, handleVisualize, handleSettings)
 
   // Auto-visualize if enabled ('bars' or 'heatmap')
-  const autoVis = getSettings().autoVisualize
+  const autoVis = currentSettings.autoVisualize
   if (autoVis !== 'off') {
     for (const candidate of candidates) {
       const compositeKey = getTableCompositeKey(candidate.id)
@@ -228,7 +232,7 @@ function activatePage(): void {
         )
       }
     }
-  })
+  }, getSettings().includeAllIntegerColumns)
 }
 
 if (isWhitelisted) {
@@ -253,6 +257,8 @@ onSettingsChange((updatedSettings) => {
   if (isWhitelisted && !wasWhitelisted) {
     console.log('[arXiv-Charts] Page is now whitelisted — activating.')
     activatePage()
+  } else if (isWhitelisted) {
+    processPage()
   }
 
   // Update menu command label to reflect current whitelist state

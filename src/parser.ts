@@ -267,6 +267,8 @@ export function extractRowNames(
  */
 export function sanitizeForParse(raw: string): string {
   let s = raw
+  // Strip zero-width characters (ZWSP, ZWNJ, ZWJ, BOM)
+  s = s.replace(/[\u200B-\u200D\uFEFF]/g, '')
   // Replace Unicode minus signs and dashes with ASCII '-'
   s = s.replace(/[\u2212\u2010\u2011\u2012\u2013\u2014]/g, '-')
   // Remove HTML tags (leftover from textContent shouldn't have many,
@@ -526,7 +528,10 @@ function extractCellText(cell: HTMLTableCellElement): string {
   ) {
     ann.remove()
   }
-  return (clone.textContent || '').replace(/\s+/g, ' ').trim()
+  return (clone.textContent || '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 /** Check if a single DOM element is bold (via tags, classes, or inline style). */
@@ -672,7 +677,10 @@ export function extractTableId(
  * Supports table.ltx_tabular, tables within figures, and standalone tables.
  * Returns candidate tables that pass the numerical-column filter.
  */
-export function discoverTables(root: ParentNode = document): CandidateTable[] {
+export function discoverTables(
+  root: ParentNode = document,
+  includeAllIntegerColumns = false,
+): CandidateTable[] {
   const candidates: CandidateTable[] = []
 
   // Query table.ltx_tabular elements, tables inside figures, and standard tables
@@ -701,8 +709,8 @@ export function discoverTables(root: ParentNode = document): CandidateTable[] {
     const parsed = parseTable(tableEl, figure)
 
     // Check numerical column filter: at least one column with ≥ 3 numeric
-    // values and not all integers
-    if (!hasQualifyingNumericColumn(parsed)) continue
+    // values and not all integers (unless includeAllIntegerColumns is true)
+    if (!hasQualifyingNumericColumn(parsed, includeAllIntegerColumns)) continue
 
     const id = extractTableId(tableEl, figure, figcaption, candidateIndex)
     candidates.push({ figure, table: tableEl, parsed, id })
@@ -713,11 +721,35 @@ export function discoverTables(root: ParentNode = document): CandidateTable[] {
 }
 
 /**
+ * Check if all non-null finite numeric values in a column are integers.
+ * Returns true if the column contains at least one numeric value and all numeric values are integers.
+ */
+export function isAllIntegerColumn(
+  data: CellValue[][],
+  colIndex: number,
+): boolean {
+  let hasNumeric = false
+  for (let r = 0; r < data.length; r++) {
+    const cell = data[r][colIndex]
+    if (cell && cell.value !== null && isFinite(cell.value)) {
+      hasNumeric = true
+      if (!Number.isInteger(cell.value)) {
+        return false
+      }
+    }
+  }
+  return hasNumeric
+}
+
+/**
  * Check if a parsed table has at least one qualifying numerical column.
  * A column qualifies if it has ≥ 3 numeric values and the numbers are not
- * all integers.
+ * all integers (unless includeAllIntegerColumns is true).
  */
-function hasQualifyingNumericColumn(parsed: ParsedTable): boolean {
+export function hasQualifyingNumericColumn(
+  parsed: ParsedTable,
+  includeAllIntegerColumns = false,
+): boolean {
   const numCols = parsed.data[0]?.length ?? 0
   for (let c = 0; c < numCols; c++) {
     let numericCount = 0
@@ -731,7 +763,7 @@ function hasQualifyingNumericColumn(parsed: ParsedTable): boolean {
         }
       }
     }
-    if (numericCount >= 3 && !allIntegers) {
+    if (numericCount >= 3 && (includeAllIntegerColumns || !allIntegers)) {
       return true
     }
   }
@@ -895,6 +927,7 @@ export function injectButtons(
  */
 export function observeForNewTables(
   callback: (newCandidates: CandidateTable[]) => void,
+  includeAllIntegerColumns = false,
 ): MutationObserver {
   const observer = new MutationObserver((mutations) => {
     let hasNewTables = false
@@ -911,7 +944,12 @@ export function observeForNewTables(
     }
 
     if (hasNewTables) {
-      const newCandidates = discoverTables()
+      const newCandidates = discoverTables(
+        document,
+        includeAllIntegerColumns,
+      ).filter(
+        (c) => !c.table.querySelector('.b-a-t-actions'),
+      )
       if (newCandidates.length > 0) {
         callback(newCandidates)
       }

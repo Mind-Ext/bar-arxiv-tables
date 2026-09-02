@@ -1,4 +1,4 @@
-import { CellValue, ParsedTable } from './parser'
+import { CellValue, isAllIntegerColumn, ParsedTable } from './parser'
 import {
   getEffectiveSettings,
   isColormap,
@@ -162,6 +162,7 @@ export function applyInlineBars(
     : 0.35
   const activeMode = overrideMode ||
     (settings.autoVisualize !== 'off' ? settings.autoVisualize : 'bars')
+  const includeAllIntegerColumns = settings.includeAllIntegerColumns ?? false
   const isBarColormap = isColormap(settings.barColorScheme)
   const barColormapCycle = isBarColormap
     ? resolveColormapCycle(settings.barColorScheme)
@@ -171,6 +172,11 @@ export function applyInlineBars(
   const divergingColormapCycle = resolveColormapCycle(
     settings.divergingColorScheme || 'PuOr',
   )
+
+  const colIsAllInteger: boolean[] = []
+  for (let c = 0; c < numCols; c++) {
+    colIsAllInteger.push(isAllIntegerColumn(data, c))
+  }
 
   // Precompute per-column colors cycled from the active palette cycle for bars mode
   const columnBarColors: BarColors[] = []
@@ -199,6 +205,9 @@ export function applyInlineBars(
 
       // Stats might be degenerate (no finite values found)
       if (!isFinite(stats[c].min) || !isFinite(stats[c].max)) continue
+
+      // Skip all-integer columns if includeAllIntegerColumns is false
+      if (!includeAllIntegerColumns && colIsAllInteger[c]) continue
 
       // Save original
       originalStyles.set(cell, cell.style.background || '')

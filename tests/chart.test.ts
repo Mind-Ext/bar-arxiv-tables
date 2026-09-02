@@ -46,7 +46,10 @@ describe('Chart & Visualization Styling', () => {
 
   describe('Color Palette Cycling across columns', () => {
     it('applies cycled palette colors to different columns', () => {
-      updateSettings({ barColorScheme: 'tab10' })
+      updateSettings({
+        barColorScheme: 'tab10',
+        includeAllIntegerColumns: true,
+      })
       // tab10 colors: #1f77b4 (rgb(31, 119, 180)), #ff7f0e (rgb(255, 127, 14)), #2ca02c ...
 
       const dom = new JSDOM(`
@@ -101,6 +104,7 @@ describe('Chart & Visualization Styling', () => {
       updateSettings({
         heatmapColorScheme: 'Viridis',
         autoVisualize: 'heatmap',
+        includeAllIntegerColumns: true,
       })
 
       const dom = new JSDOM(`
@@ -148,6 +152,7 @@ describe('Chart & Visualization Styling', () => {
         heatmapColorScheme: 'Cividis',
         divergingColorScheme: 'PuOr',
         autoVisualize: 'heatmap',
+        includeAllIntegerColumns: true,
       })
 
       const dom = new JSDOM(`
@@ -197,7 +202,11 @@ describe('Chart & Visualization Styling', () => {
     })
 
     it('applies continuous colormap colors to bars in bar mode when barColorScheme is a colormap', () => {
-      updateSettings({ barColorScheme: 'Viridis', renderMode: 'bars' })
+      updateSettings({
+        barColorScheme: 'Viridis',
+        renderMode: 'bars',
+        includeAllIntegerColumns: true,
+      })
 
       const dom = new JSDOM(`
         <figure>
@@ -237,7 +246,10 @@ describe('Chart & Visualization Styling', () => {
     })
 
     it('renders bipolar columns with centered zero at 50% and consistent column palette colors', () => {
-      updateSettings({ barColorScheme: 'tab10' })
+      updateSettings({
+        barColorScheme: 'tab10',
+        includeAllIntegerColumns: true,
+      })
       // tab10[0] = #1f77b4 -> rgb(31, 119, 180)
 
       const dom = new JSDOM(`
@@ -297,7 +309,10 @@ describe('Chart & Visualization Styling', () => {
     })
 
     it('renders all-negative columns with column palette colors', () => {
-      updateSettings({ barColorScheme: 'tab10' })
+      updateSettings({
+        barColorScheme: 'tab10',
+        includeAllIntegerColumns: true,
+      })
 
       const dom = new JSDOM(`
         <figure>
@@ -439,8 +454,8 @@ describe('Chart & Visualization Styling', () => {
       const dom = new JSDOM(`
         <figure>
           <table>
-            <tr><td>10</td></tr>
-            <tr><td>20</td></tr>
+            <tr><td>10.5</td></tr>
+            <tr><td>20.5</td></tr>
           </table>
         </figure>
       `)
@@ -454,10 +469,10 @@ describe('Chart & Visualization Styling', () => {
         rowNames: [['R1'], ['R2']],
         topNonNumRows: 0,
         leftNonNumCols: 0,
-        data: [[{ value: 10, isHighlighted: false, raw: '10' }], [{
-          value: 20,
+        data: [[{ value: 10.5, isHighlighted: false, raw: '10.5' }], [{
+          value: 20.5,
           isHighlighted: false,
-          raw: '20',
+          raw: '20.5',
         }]],
         domCells: [[table.rows[0].cells[0]], [table.rows[1].cells[0]]],
         orientation: 'column',
@@ -479,8 +494,8 @@ describe('Chart & Visualization Styling', () => {
     it('updateAllVisualizations re-renders active visualizations without looping infinitely', () => {
       const dom = new JSDOM(`
         <table>
-          <tr><td>10</td></tr>
-          <tr><td>20</td></tr>
+          <tr><td>10.5</td></tr>
+          <tr><td>20.5</td></tr>
         </table>
       `)
       const table = dom.window.document.querySelector(
@@ -492,10 +507,10 @@ describe('Chart & Visualization Styling', () => {
         rowNames: [['R1'], ['R2']],
         topNonNumRows: 0,
         leftNonNumCols: 0,
-        data: [[{ value: 10, isHighlighted: false, raw: '10' }], [{
-          value: 20,
+        data: [[{ value: 10.5, isHighlighted: false, raw: '10.5' }], [{
+          value: 20.5,
           isHighlighted: false,
-          raw: '20',
+          raw: '20.5',
         }]],
         domCells: [[table.rows[0].cells[0]], [table.rows[1].cells[0]]],
         orientation: 'column',
@@ -503,6 +518,97 @@ describe('Chart & Visualization Styling', () => {
 
       applyInlineBars(parsed, table, 'bars', 'test#t1')
       expect(() => updateAllVisualizations()).not.toThrow()
+    })
+  })
+
+  describe('includeAllIntegerColumns setting', () => {
+    it('skips all-integer columns by default and only styles non-integer columns', () => {
+      const dom = new JSDOM(`
+        <table>
+          <tr><td>10</td><td>10.5</td></tr>
+          <tr><td>20</td><td>20.5</td></tr>
+        </table>
+      `)
+      const table = dom.window.document.querySelector(
+        'table',
+      ) as HTMLTableElement
+      const tdInt0 = table.rows[0].cells[0]
+      const tdFloat0 = table.rows[0].cells[1]
+
+      const parsed: ParsedTable = {
+        caption: 'Mixed Table',
+        colNames: [['IntCol'], ['FloatCol']],
+        rowNames: [['R1'], ['R2']],
+        topNonNumRows: 0,
+        leftNonNumCols: 0,
+        data: [
+          [
+            { value: 10, isHighlighted: false, raw: '10' },
+            { value: 10.5, isHighlighted: false, raw: '10.5' },
+          ],
+          [
+            { value: 20, isHighlighted: false, raw: '20' },
+            { value: 20.5, isHighlighted: false, raw: '20.5' },
+          ],
+        ],
+        domCells: [
+          [tdInt0, tdFloat0],
+          [table.rows[1].cells[0], table.rows[1].cells[1]],
+        ],
+        orientation: 'column',
+      }
+
+      applyInlineBars(parsed, table)
+
+      // Default (includeAllIntegerColumns: false): integer column should have NO background style
+      expect(tdInt0.style.background).toBe('')
+      // Float column should have background gradient
+      expect(tdFloat0.style.background).toContain('linear-gradient')
+    })
+
+    it('styles all-integer columns when includeAllIntegerColumns is true', () => {
+      updateSettings({ includeAllIntegerColumns: true })
+
+      const dom = new JSDOM(`
+        <table>
+          <tr><td>10</td><td>10.5</td></tr>
+          <tr><td>20</td><td>20.5</td></tr>
+        </table>
+      `)
+      const table = dom.window.document.querySelector(
+        'table',
+      ) as HTMLTableElement
+      const tdInt0 = table.rows[0].cells[0]
+      const tdFloat0 = table.rows[0].cells[1]
+
+      const parsed: ParsedTable = {
+        caption: 'Mixed Table',
+        colNames: [['IntCol'], ['FloatCol']],
+        rowNames: [['R1'], ['R2']],
+        topNonNumRows: 0,
+        leftNonNumCols: 0,
+        data: [
+          [
+            { value: 10, isHighlighted: false, raw: '10' },
+            { value: 10.5, isHighlighted: false, raw: '10.5' },
+          ],
+          [
+            { value: 20, isHighlighted: false, raw: '20' },
+            { value: 20.5, isHighlighted: false, raw: '20.5' },
+          ],
+        ],
+        domCells: [
+          [tdInt0, tdFloat0],
+          [table.rows[1].cells[0], table.rows[1].cells[1]],
+        ],
+        orientation: 'column',
+      }
+
+      applyInlineBars(parsed, table)
+
+      // With includeAllIntegerColumns: true, integer column also receives background styling
+      expect(tdInt0.style.background).toContain('linear-gradient')
+      expect(tdFloat0.style.background).toContain('linear-gradient')
     })
   })
 })

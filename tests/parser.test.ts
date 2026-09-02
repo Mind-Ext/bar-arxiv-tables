@@ -13,8 +13,11 @@ import {
   CellValue,
   discoverTables,
   expandGrid,
+  hasQualifyingNumericColumn,
+  isAllIntegerColumn,
   ParsedTable,
   parseTable,
+  sanitizeForParse,
 } from '../src/parser'
 
 // ---------------------------------------------------------------------------
@@ -243,5 +246,89 @@ describe('enhanced style detection (bold / underline)', () => {
     expect(parsed.data[0][0].isHighlighted).toBe(true)
     expect(parsed.data[1][0].isHighlighted).toBe(true)
     expect(parsed.data[2][0].isHighlighted).toBe(true)
+  })
+})
+
+describe('isAllIntegerColumn helper', () => {
+  it('returns true when all numeric cells in a column are integers', () => {
+    const data: CellValue[][] = [
+      [{ value: 1, isHighlighted: false, raw: '1' }],
+      [{ value: 20, isHighlighted: false, raw: '20' }],
+      [{ value: 300, isHighlighted: false, raw: '300' }],
+    ]
+    expect(isAllIntegerColumn(data, 0)).toBe(true)
+  })
+
+  it('returns false when at least one numeric cell is a float', () => {
+    const data: CellValue[][] = [
+      [{ value: 1, isHighlighted: false, raw: '1' }],
+      [{ value: 2.5, isHighlighted: false, raw: '2.5' }],
+      [{ value: 300, isHighlighted: false, raw: '300' }],
+    ]
+    expect(isAllIntegerColumn(data, 0)).toBe(false)
+  })
+
+  it('ignores null values and returns true if remaining values are integers', () => {
+    const data: CellValue[][] = [
+      [{ value: null, isHighlighted: false, raw: '' }],
+      [{ value: 5, isHighlighted: false, raw: '5' }],
+      [{ value: 10, isHighlighted: false, raw: '10' }],
+    ]
+    expect(isAllIntegerColumn(data, 0)).toBe(true)
+  })
+
+  it('returns false if column has no numeric values', () => {
+    const data: CellValue[][] = [
+      [{ value: null, isHighlighted: false, raw: '' }],
+      [{ value: null, isHighlighted: false, raw: '' }],
+    ]
+    expect(isAllIntegerColumn(data, 0)).toBe(false)
+  })
+})
+
+describe('discoverTables with includeAllIntegerColumns flag', () => {
+  const pureIntegerHtml = `
+    <table>
+      <thead><tr><th>A</th><th>B</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>10</td></tr>
+        <tr><td>2</td><td>20</td></tr>
+        <tr><td>3</td><td>30</td></tr>
+      </tbody>
+    </table>
+  `
+
+  it('rejects pure-integer table when includeAllIntegerColumns is false (default)', () => {
+    const dom = new JSDOM(pureIntegerHtml)
+    const candidates = discoverTables(dom.window.document, false)
+    expect(candidates).toHaveLength(0)
+  })
+
+  it('discovers pure-integer table when includeAllIntegerColumns is true', () => {
+    const dom = new JSDOM(pureIntegerHtml)
+    const candidates = discoverTables(dom.window.document, true)
+    expect(candidates).toHaveLength(1)
+  })
+})
+
+describe('zero-width character removal', () => {
+  it('strips zero-width characters in sanitizeForParse and table headers', () => {
+    expect(sanitizeForParse('P\u200Bd\u200Cr\u200Do\u200Bp')).toBe('Pdrop')
+    expect(sanitizeForParse('9\u200B5\uFEFF.2')).toBe('95.2')
+
+    const html = `
+      <table>
+        <thead><tr><th>P\u200Bd\u200Cr\u200Do\u200Bp</th></tr></thead>
+        <tbody>
+          <tr><td>0.1</td></tr>
+          <tr><td>0.2</td></tr>
+          <tr><td>0.3</td></tr>
+        </tbody>
+      </table>
+    `
+    const dom = new JSDOM(html)
+    const table = dom.window.document.querySelector('table') as HTMLTableElement
+    const parsed = parseTable(table)
+    expect(parsed.colNames[0]).toEqual(['Pdrop'])
   })
 })

@@ -1,0 +1,104 @@
+{
+  "caption": "Table 3: Variations on the",
+  "orientation": "column",
+  "totalRowCount": 23,
+  "totalColCount": 13,
+  "topNonNumRows": 2,
+  "leftNonNumCols": 1,
+  "metrics": [
+    {
+      "colName": ["N"],
+      "min": 2,
+      "max": 8,
+      "nullCount": 15,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "colName": ["dmodel"],
+      "min": 256,
+      "max": 1024,
+      "nullCount": 16,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "colName": ["dff"],
+      "min": 1024,
+      "max": 4096,
+      "nullCount": 16,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "colName": ["h"],
+      "min": 1,
+      "max": 32,
+      "nullCount": 14,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "colName": ["dk"],
+      "min": 16,
+      "max": 512,
+      "nullCount": 11,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "colName": ["dv"],
+      "min": 16,
+      "max": 512,
+      "nullCount": 13,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "colName": ["Pdrop"],
+      "min": 0,
+      "max": 0.3,
+      "nullCount": 16,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "colName": ["ϵls"],
+      "min": 0,
+      "max": 0.2,
+      "nullCount": 17,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "colName": ["train", "steps"],
+      "nullCount": 20,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "colName": ["PPL", "(dev)"],
+      "min": 4.33,
+      "max": 6.11,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "colName": ["BLEU", "(dev)"],
+      "min": 23.7,
+      "max": 26.4,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "colName": ["params", "× 10 6"],
+      "min": 28,
+      "max": 213,
+      "nullCount": 9,
+      "highlightedCount": 0,
+      "hasSd": false
+    }
+  ]
+}
