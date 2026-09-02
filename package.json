@@ -8,7 +8,8 @@
     "build": "vite build",
     "test": "vitest",
     "fmt": "deno fmt --single-quote --no-semicolons src/ tests/",
-    "fmt:check": "deno fmt --check --single-quote --no-semicolons src/ tests/"
+    "fmt:check": "deno fmt --check --single-quote --no-semicolons src/ tests/",
+    "release": "node scripts/release.js"
   },
   "keywords": [],
   "author": "",

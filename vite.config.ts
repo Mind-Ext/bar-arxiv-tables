@@ -20,8 +20,8 @@ export default defineConfig({
           'GM_registerMenuCommand',
           'GM_unregisterMenuCommand',
         ],
-        updateURL: 'https://github.com/Mind-Ext/bar-arxiv-tables/raw/main/dist/bar-arxiv-tables.user.js',
-        downloadURL: 'https://github.com/Mind-Ext/bar-arxiv-tables/raw/main/dist/bar-arxiv-tables.user.js',
+        updateURL: 'https://github.com/Mind-Ext/bar-arxiv-tables/releases/latest/download/bar-arxiv-tables.user.js',
+        downloadURL: 'https://github.com/Mind-Ext/bar-arxiv-tables/releases/latest/download/bar-arxiv-tables.user.js',
       },
       build: {
         fileName: 'bar-arxiv-tables.user.js',
