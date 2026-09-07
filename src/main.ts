@@ -1,5 +1,5 @@
 /**
- * arXiv Chart Visualizer — Main Entry
+ * bar-arxiv-tables — Main Entry
  *
  * Orchestrates settings, table discovery, UI injection, and visualization.
  */
@@ -25,12 +25,12 @@ import {
 } from './chart'
 import { toggleSettingsPopover } from './ui/settingsPopover'
 
-console.log('[arXiv-Charts] Initializing arXiv Chart Visualizer...')
+console.log('[bar-arxiv-tables] Initializing bar-arxiv-tables...')
 const settings = getSettings()
 const currentUrl = typeof window !== 'undefined' ? window.location.href : ''
 let isWhitelisted = isUrlAllowed(currentUrl, settings.urlWhitelist)
 console.log(
-  `[arXiv-Charts] Whitelist status: ${
+  `[bar-arxiv-tables] Whitelist status: ${
     isWhitelisted ? 'WHITELISTED' : 'DISABLED'
   } (${currentUrl})`,
 )
@@ -186,7 +186,9 @@ function processPage(): void {
     document,
     currentSettings.includeAllIntegerColumns,
   )
-  console.log(`[arXiv-Charts] Found ${candidates.length} candidate table(s).`)
+  console.log(
+    `[bar-arxiv-tables] Found ${candidates.length} candidate table(s).`,
+  )
 
   injectButtons(candidates, handleVisualize, handleSettings)
 
@@ -217,7 +219,9 @@ function activatePage(): void {
 
   // Watch for dynamically injected tables
   tableObserver = observeForNewTables((newCandidates) => {
-    console.log(`[arXiv-Charts] Detected ${newCandidates.length} new table(s).`)
+    console.log(
+      `[bar-arxiv-tables] Detected ${newCandidates.length} new table(s).`,
+    )
     injectButtons(newCandidates, handleVisualize, handleSettings)
 
     const autoVis = getSettings().autoVisualize
@@ -239,7 +243,7 @@ if (isWhitelisted) {
   activatePage()
 } else {
   console.log(
-    '[arXiv-Charts] Page URL not in whitelist. Skipping table detection.',
+    '[bar-arxiv-tables] Page URL not in whitelist. Skipping table detection.',
   )
 }
 
@@ -248,14 +252,14 @@ if (isWhitelisted) {
 // ---------------------------------------------------------------------------
 
 onSettingsChange((updatedSettings) => {
-  console.log('[arXiv-Charts] Settings updated in-place:', updatedSettings)
+  console.log('[bar-arxiv-tables] Settings updated in-place:', updatedSettings)
 
   // Re-evaluate whitelist status reactively
   const wasWhitelisted = isWhitelisted
   isWhitelisted = isUrlAllowed(currentUrl, updatedSettings.urlWhitelist)
 
   if (isWhitelisted && !wasWhitelisted) {
-    console.log('[arXiv-Charts] Page is now whitelisted — activating.')
+    console.log('[bar-arxiv-tables] Page is now whitelisted — activating.')
     activatePage()
   } else if (isWhitelisted) {
     processPage()

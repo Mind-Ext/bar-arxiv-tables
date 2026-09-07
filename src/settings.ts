@@ -1,5 +1,5 @@
 /**
- * Settings and state management for arXiv Chart Visualizer.
+ * Settings and state management for bar-arxiv-tables.
  * Supports persistent storage via GM_getValue/GM_setValue with fallback to localStorage.
  * Notifies subscribers immediately on change without page reloads.
  */
@@ -166,7 +166,8 @@ function getValue<T>(key: string, defaultValue: T): T {
       return GM_getValue(key, defaultValue)
     }
     if (typeof localStorage !== 'undefined' && localStorage) {
-      const stored = localStorage.getItem(`arxiv_chart_${key}`)
+      const stored = localStorage.getItem(`bar_arxiv_tables_${key}`) ??
+        localStorage.getItem(`arxiv_chart_${key}`)
       if (stored !== null) {
         return JSON.parse(stored)
       }
@@ -187,7 +188,7 @@ function setValue<T>(key: string, value: T): void {
       return
     }
     if (typeof localStorage !== 'undefined' && localStorage) {
-      localStorage.setItem(`arxiv_chart_${key}`, JSON.stringify(value))
+      localStorage.setItem(`bar_arxiv_tables_${key}`, JSON.stringify(value))
       return
     }
   } catch (e) {
@@ -437,7 +438,7 @@ function notifyListeners(settings: Settings): void {
     try {
       listener(settings)
     } catch (e) {
-      console.error('[arXiv-Charts] Error in settings change listener:', e)
+      console.error('[bar-arxiv-tables] Error in settings change listener:', e)
     }
   }
 }

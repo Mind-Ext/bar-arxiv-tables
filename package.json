@@ -1,7 +1,7 @@
 {
   "name": "bar-arxiv-tables",
   "version": "0.1.0",
-  "description": "arXiv Table-to-Chart Userscript",
+  "description": "Userscript to visualize numerical tables on arXiv HTML papers with bar charts and heatmaps",
   "main": "index.js",
   "scripts": {
     "dev": "vite",
@@ -12,8 +12,8 @@
     "release": "node scripts/release.js"
   },
   "keywords": [],
-  "author": "",
-  "license": "GPL-3.0-or-later",
+  "author": "King-of-Infinite-Space (https://github.com/King-of-Infinite-Space)",
+  "license": "MIT",
   "type": "module",
   "devDependencies": {
     "@types/d3-scale-chromatic": "^3.1.0",

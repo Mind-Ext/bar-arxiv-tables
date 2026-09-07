@@ -1,5 +1,5 @@
 /**
- * Settings Popover UI Component for arXiv Chart Visualizer.
+ * Settings Popover UI Component for bar-arxiv-tables.
  *
  * Provides a modular, per-tab popover (Current Table / Visualization / Site Whitelist)
  * for configuring per-table and global default visualization settings with live preview.
