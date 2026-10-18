@@ -444,6 +444,43 @@ describe('DOM cell text extraction (extractCellText)', () => {
     const cell = dom.window.document.querySelector('th') as HTMLTableCellElement
     expect(extractCellText(cell)).toBe('dmodel')
   })
+
+  it('removes footnote elements and footnote marks from cell text', () => {
+    const dom = new JSDOM(
+      '<table><tr><td>85.4<span class="ltx_note ltx_role_footnote"><sup class="ltx_note_mark">1</sup><span class="ltx_note_outer"><span class="ltx_note_content">Footnote text</span></span></span></td></tr></table>',
+    )
+    const cell = dom.window.document.querySelector('td') as HTMLTableCellElement
+    expect(extractCellText(cell)).toBe('85.4')
+  })
+})
+
+describe('Superscript and annotation symbol sanitization (sanitizeForParse)', () => {
+  it('strips non-exponent superscripts like footnote markers', () => {
+    expect(sanitizeForParse('73.6^{α}')).toBe('73.6')
+    expect(sanitizeForParse('56.41^{γ}')).toBe('56.41')
+    expect(sanitizeForParse('85.4^{1}')).toBe('85.4')
+    expect(sanitizeForParse('85.4^{*}')).toBe('85.4')
+    expect(sanitizeForParse('85.4^{a,b}')).toBe('85.4')
+  })
+
+  it('preserves scientific exponents while stripping footnote superscripts', () => {
+    expect(sanitizeForParse('1.23 × 10^{-4}')).toBe('1.23e-4')
+    expect(sanitizeForParse('1.23 × 10^{-4}^{a}')).toBe('1.23e-4')
+    expect(parseNumeric(sanitizeForParse('1.23 × 10^{-4}^{a}')).value)
+      .toBeCloseTo(0.000123, 7)
+  })
+
+  it('strips annotation symbols including asterisks, section markers, and trend arrows', () => {
+    expect(sanitizeForParse('85.4*')).toBe('85.4')
+    expect(sanitizeForParse('90.1***')).toBe('90.1')
+    expect(sanitizeForParse('85.4†')).toBe('85.4')
+    expect(sanitizeForParse('85.4‡')).toBe('85.4')
+    expect(sanitizeForParse('85.4§')).toBe('85.4')
+    expect(sanitizeForParse('85.4¶')).toBe('85.4')
+    expect(sanitizeForParse('85.4 ↑')).toBe('85.4')
+    expect(sanitizeForParse('72.1↓')).toBe('72.1')
+    expect(sanitizeForParse('90.0▲')).toBe('90.0')
+  })
 })
 
 describe('discoverTables with scientific notation', () => {

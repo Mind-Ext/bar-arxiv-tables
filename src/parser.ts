@@ -335,9 +335,12 @@ export function sanitizeForParse(raw: string): string {
     },
   )
 
+  // Strip remaining non-exponent superscripts (e.g. footnote/reference markers: ^{1}, ^{α}, ^{*}, etc.)
+  s = s.replace(/\^\{[^}]*\}/g, '')
+
   // Remove HTML tags (leftover from textContent shouldn't have many, but just in case)
   s = s.replace(/<[^>]+>/g, '')
-  // Remove LaTeX formatting commands: \textbf{}, \mathbf{}, \underline{}, etc.
+  // Remove LaTeX formatting commands: \textbf{}, \mathbf{}, \textit{}, \mathit{}, \underline{}, \textsc{}, \mathrm{}
   s = s.replace(
     /\\(?:textbf|mathbf|textit|mathit|underline|textsc|mathrm)\{([^}]*)\}/g,
     '$1',
@@ -346,8 +349,10 @@ export function sanitizeForParse(raw: string): string {
   s = s.replace(/\\[a-zA-Z]+/g, '')
   // Strip wrapping LaTeX math delimiters $…$
   s = s.replace(/\$(.*?)\$/g, '$1')
-  // Strip %, ‰, †, ‡ superscript markers
-  s = s.replace(/[%‰†‡]/g, '')
+  // Strip %, ‰, †, ‡, *, §, ¶ superscript and footnote markers
+  s = s.replace(/[%‰†‡*§¶]/g, '')
+  // Strip trend/direction indicator arrows
+  s = s.replace(/[↑↓▲▼△▽]/g, '')
   // Collapse whitespace
   s = s.replace(/\s+/g, ' ').trim()
   // Collapse whitespace around scientific 'e' / 'E' (e.g. "1.23 e-4" -> "1.23e-4")
@@ -729,6 +734,17 @@ export function extractCellText(cell: HTMLTableCellElement): string {
     )
   ) {
     ann.remove()
+  }
+
+  // Remove footnote elements and marks
+  for (
+    const note of Array.from(
+      clone.querySelectorAll(
+        '.ltx_note, .ltx_role_footnote, .ltx_note_mark, sup.ltx_note_mark',
+      ),
+    )
+  ) {
+    note.remove()
   }
 
   // Preserve <sup> and .ltx_sup exponents

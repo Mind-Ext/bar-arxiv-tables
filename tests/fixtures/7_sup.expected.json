@@ -1,0 +1,58 @@
+{
+  "caption": "Table 3: Performance on MTEB",
+  "metricAxis": "column",
+  "totalRowCount": 16,
+  "totalColCount": 8,
+  "topNonNumRows": 3,
+  "leftNonNumCols": 2,
+  "metrics": [
+    {
+      "colName": ["Dim"],
+      "min": 1024,
+      "max": 4096,
+      "nullCount": 0,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "colName": ["MTEB (Eng, v2)", "Mean (Task)"],
+      "min": 65.53,
+      "max": 75.22,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "colName": ["MTEB (Eng, v2)", "Mean (Type)"],
+      "min": 61.21,
+      "max": 68.70,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "colName": ["CMTEB", "Mean (Task)"],
+      "min": 63.0,
+      "max": 73.83,
+      "nullCount": 5,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "colName": ["CMTEB", "Mean (Type)"],
+      "min": 62.0,
+      "max": 75.00,
+      "nullCount": 5,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "colName": ["MTEB (Code)"],
+      "min": 51.94,
+      "max": 80.68,
+      "nullCount": 2,
+      "highlightedCount": 1,
+      "hasSd": false
+    }
+  ]
+}
