@@ -1,7 +1,7 @@
 /**
  * Settings Popover UI Component for bar-arxiv-tables.
  *
- * Provides a modular, per-tab popover (Current Table / Visualization / Site Whitelist)
+ * Provides a modular, per-tab popover (Current Table / Global / Site Whitelist)
  * for configuring per-table and global default visualization settings with live preview.
  */
 
@@ -39,6 +39,32 @@ export interface ColorSchemeGroupValues {
   barColorScheme: string
   heatmapColorScheme: string
   divergingColorScheme: string
+}
+
+export interface LocalTableValues {
+  barColorScheme: string
+  heatmapColorScheme: string
+  divergingColorScheme: string
+  metricAxis: MetricAxisMode
+  includeAllIntegerColumns: boolean
+}
+
+export function isLocalSettingsEqualGlobal(
+  local: LocalTableValues,
+  global: Settings,
+  detectedMetricAxis: MetricAxisMode = 'column',
+): boolean {
+  const effectiveDefaultAxis = global.metricAxis && global.metricAxis !== 'auto'
+    ? global.metricAxis
+    : (detectedMetricAxis !== 'auto' ? detectedMetricAxis : 'column')
+  return (
+    local.barColorScheme === global.barColorScheme &&
+    local.heatmapColorScheme === global.heatmapColorScheme &&
+    local.divergingColorScheme === global.divergingColorScheme &&
+    (local.metricAxis === effectiveDefaultAxis ||
+      local.metricAxis === 'auto') &&
+    local.includeAllIntegerColumns === global.includeAllIntegerColumns
+  )
 }
 
 export interface TabRenderContext {
@@ -460,6 +486,11 @@ const localTab: SettingsTab = {
 
       ${renderColorSchemeGroup('local', ctx.options)}
 
+      <div class="b-a-t-settings-field-checkbox">
+        <input type="checkbox" name="local-includeAllIntegerColumns" id="local-cb-int">
+        <label for="local-cb-int">Include All-Integer Columns</label>
+      </div>
+
       <div class="b-a-t-settings-footer">
         <button class="b-a-t-btn" data-action="reset-local">Reset to Global</button>
         <button class="b-a-t-btn b-a-t-btn-primary" data-action="apply">Save for Table</button>
@@ -470,7 +501,7 @@ const localTab: SettingsTab = {
 
 const globalTab: SettingsTab = {
   id: 'global',
-  label: 'Visualization',
+  label: 'Global',
   isAvailable: () => true,
   renderPanel: (isActive, ctx) => `
     <div class="b-a-t-settings-panel ${
@@ -821,24 +852,32 @@ export function toggleSettingsPopover(
     'textarea[name="urlWhitelist"]',
   )
 
-  const updateLocalBadge = (): void => {
-    if (!localBadge || !compositeKey) return
-    const globalSettings = getSettings()
-    const currentLocal = getGroupSchemeValues(popover, 'local')
+  const getLocalFormValues = (): LocalTableValues => {
+    const schemes = getGroupSchemeValues(popover, 'local')
     const axisSelect = popover.querySelector<HTMLSelectElement>(
       'select[name="local-metricAxis"]',
     )
-    const currentAxis = (axisSelect?.value as MetricAxisMode) ||
+    const metricAxis = (axisSelect?.value as MetricAxisMode) ||
       effectiveDetectedAxis
+    const incIntCheckbox = popover.querySelector<HTMLInputElement>(
+      'input[name="local-includeAllIntegerColumns"]',
+    )
+    const includeAllIntegerColumns = Boolean(incIntCheckbox?.checked)
+    return {
+      ...schemes,
+      metricAxis,
+      includeAllIntegerColumns,
+    }
+  }
 
-    const isCustom = Boolean(
-      getLocalTableSettings(compositeKey) ||
-        currentLocal.barColorScheme !== globalSettings.barColorScheme ||
-        currentLocal.heatmapColorScheme !==
-          globalSettings.heatmapColorScheme ||
-        currentLocal.divergingColorScheme !==
-          globalSettings.divergingColorScheme ||
-        currentAxis !== effectiveDetectedAxis,
+  const updateLocalBadge = (): void => {
+    if (!localBadge || !compositeKey) return
+    const globalSettings = getSettings()
+    const currentLocal = getLocalFormValues()
+    const isCustom = !isLocalSettingsEqualGlobal(
+      currentLocal,
+      globalSettings,
+      effectiveDetectedAxis,
     )
 
     if (isCustom) {
@@ -875,18 +914,44 @@ export function toggleSettingsPopover(
 
   const triggerLivePreviewLocal = (): void => {
     if (!compositeKey) return
-    const values = getGroupSchemeValues(popover, 'local')
+    const values = getLocalFormValues()
+    const globalSettings = getSettings()
+    const isCustom = !isLocalSettingsEqualGlobal(
+      values,
+      globalSettings,
+      effectiveDetectedAxis,
+    )
+
+    if (isCustom) {
+      setLocalTableSettings(compositeKey, values)
+    } else {
+      clearLocalTableSettings(compositeKey)
+    }
+    updateLocalBadge()
+    onUpdate()
+  }
+
+  const populateLocalFields = (): void => {
+    if (!compositeKey) return
+    const effective = getEffectiveSettings(compositeKey)
+    setGroupSchemeValues(popover, effective, 'local')
+    const localEntry = getLocalTableSettings(compositeKey)
     const axisSelect = popover.querySelector<HTMLSelectElement>(
       'select[name="local-metricAxis"]',
     )
-    const metricAxis = (axisSelect?.value as MetricAxisMode) ||
-      effectiveDetectedAxis
-    setLocalTableSettings(compositeKey, {
-      ...values,
-      metricAxis,
-    })
+    if (axisSelect) {
+      const savedAxis = localEntry?.settings.metricAxis
+      axisSelect.value = savedAxis && savedAxis !== 'auto'
+        ? savedAxis
+        : effectiveDetectedAxis
+    }
+    const incIntCheckbox = popover.querySelector<HTMLInputElement>(
+      'input[name="local-includeAllIntegerColumns"]',
+    )
+    if (incIntCheckbox) {
+      incIntCheckbox.checked = effective.includeAllIntegerColumns
+    }
     updateLocalBadge()
-    onUpdate()
   }
 
   const triggerLivePreviewGlobal = (): void => {
@@ -917,7 +982,11 @@ export function toggleSettingsPopover(
     }
 
     updateSettings(draftGlobal)
-    updateLocalBadge()
+    if (compositeKey && !getLocalTableSettings(compositeKey)) {
+      populateLocalFields()
+    } else {
+      updateLocalBadge()
+    }
     onUpdate()
   }
 
@@ -925,21 +994,7 @@ export function toggleSettingsPopover(
     const globalSettings = getSettings()
 
     // Local tab fields
-    if (compositeKey) {
-      const effective = getEffectiveSettings(compositeKey)
-      setGroupSchemeValues(popover, effective, 'local')
-      const localEntry = getLocalTableSettings(compositeKey)
-      const axisSelect = popover.querySelector<HTMLSelectElement>(
-        'select[name="local-metricAxis"]',
-      )
-      if (axisSelect) {
-        const savedAxis = localEntry?.settings.metricAxis
-        axisSelect.value = savedAxis && savedAxis !== 'auto'
-          ? savedAxis
-          : effectiveDetectedAxis
-      }
-      updateLocalBadge()
-    }
+    populateLocalFields()
 
     // Global tab fields
     setGroupSchemeValues(popover, globalSettings, '')
@@ -1045,16 +1100,19 @@ export function toggleSettingsPopover(
 
       case 'apply': {
         if (compositeKey) {
-          const values = getGroupSchemeValues(popover, 'local')
-          const axisSelect = popover.querySelector<HTMLSelectElement>(
-            'select[name="local-metricAxis"]',
+          const values = getLocalFormValues()
+          const globalSettings = getSettings()
+          const isCustom = !isLocalSettingsEqualGlobal(
+            values,
+            globalSettings,
+            effectiveDetectedAxis,
           )
-          const metricAxis = (axisSelect?.value as MetricAxisMode) ||
-            effectiveDetectedAxis
-          setLocalTableSettings(compositeKey, {
-            ...values,
-            metricAxis,
-          })
+
+          if (isCustom) {
+            setLocalTableSettings(compositeKey, values)
+          } else {
+            clearLocalTableSettings(compositeKey)
+          }
         }
         isSaved = true
         onUpdate()
@@ -1066,7 +1124,7 @@ export function toggleSettingsPopover(
         if (compositeKey) {
           clearLocalTableSettings(compositeKey)
         }
-        populateFields()
+        populateLocalFields()
         onUpdate()
         break
       }

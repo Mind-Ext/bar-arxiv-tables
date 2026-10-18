@@ -87,6 +87,7 @@ export interface LocalTableSetting {
     heatmapColorScheme: string
     divergingColorScheme: string
     metricAxis: MetricAxisMode
+    includeAllIntegerColumns: boolean
   }>
 }
 
@@ -600,6 +601,9 @@ export function getEffectiveSettings(compositeKey?: string): Settings {
   }
   if (entry.settings.metricAxis !== undefined) {
     merged.metricAxis = entry.settings.metricAxis
+  }
+  if (entry.settings.includeAllIntegerColumns !== undefined) {
+    merged.includeAllIntegerColumns = entry.settings.includeAllIntegerColumns
   }
   return merged
 }

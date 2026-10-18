@@ -614,6 +614,52 @@ describe('Chart & Visualization Styling', () => {
       expect(tdInt0.style.background).toContain('linear-gradient')
       expect(tdFloat0.style.background).toContain('linear-gradient')
     })
+
+    it('styles all-integer columns when local override has includeAllIntegerColumns: true while global is false', () => {
+      updateSettings({ includeAllIntegerColumns: false })
+      const compositeKey = 'paper#t-int-override'
+      setLocalTableSettings(compositeKey, { includeAllIntegerColumns: true })
+
+      const dom = new JSDOM(`
+        <table>
+          <tr><td>10</td><td>10.5</td></tr>
+          <tr><td>20</td><td>20.5</td></tr>
+        </table>
+      `)
+      const table = dom.window.document.querySelector(
+        'table',
+      ) as HTMLTableElement
+      const tdInt0 = table.rows[0].cells[0]
+      const tdFloat0 = table.rows[0].cells[1]
+
+      const parsed: ParsedTable = {
+        caption: 'Mixed Table Local Override',
+        colNames: [['IntCol'], ['FloatCol']],
+        rowNames: [['R1'], ['R2']],
+        topNonNumRows: 0,
+        leftNonNumCols: 0,
+        data: [
+          [
+            { value: 10, isHighlighted: false, raw: '10' },
+            { value: 10.5, isHighlighted: false, raw: '10.5' },
+          ],
+          [
+            { value: 20, isHighlighted: false, raw: '20' },
+            { value: 20.5, isHighlighted: false, raw: '20.5' },
+          ],
+        ],
+        domCells: [
+          [tdInt0, tdFloat0],
+          [table.rows[1].cells[0], table.rows[1].cells[1]],
+        ],
+        orientation: 'column',
+      }
+
+      applyInlineBars(parsed, table, undefined, compositeKey)
+
+      expect(tdInt0.style.background).toContain('linear-gradient')
+      expect(tdFloat0.style.background).toContain('linear-gradient')
+    })
   })
 
   describe('metricAxis: "row" rendering', () => {

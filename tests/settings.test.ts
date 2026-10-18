@@ -229,6 +229,14 @@ describe('Effective Settings', () => {
     const eff = getEffectiveSettings('paper#table-1')
     expect(eff.barColorScheme).toBe('Set1')
   })
+
+  it('merges includeAllIntegerColumns override onto global settings', () => {
+    setLocalTableSettings('paper#table-1', {
+      includeAllIntegerColumns: true,
+    })
+    const eff = getEffectiveSettings('paper#table-1')
+    expect(eff.includeAllIntegerColumns).toBe(true)
+  })
 })
 
 describe('URL Whitelist & Scope Matching', () => {

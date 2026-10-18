@@ -174,6 +174,12 @@ describe('Settings Popover UI', () => {
       const localTab = popover.querySelector('[data-tab="local"]')!
       expect(localTab.classList.contains('active')).toBe(true)
     })
+
+    it('displays "Global" as tab label', () => {
+      toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
+      const globalTab = getPopover()!.querySelector('[data-tab="global"]')!
+      expect(globalTab.textContent.trim()).toBe('Global')
+    })
   })
 
   // -----------------------------------------------------------------------
@@ -194,6 +200,43 @@ describe('Settings Popover UI', () => {
       const badge = getPopover()!.querySelector('#local-status-badge')!
       expect(badge.textContent).toBe('Custom Override Active')
       expect(badge.classList.contains('b-a-t-badge-custom')).toBe(true)
+    })
+
+    it('shows "Using Global Defaults" when custom override matches global values', () => {
+      setLocalTableSettings('paper#t1', {
+        barColorScheme: DEFAULT_SETTINGS.barColorScheme,
+        heatmapColorScheme: DEFAULT_SETTINGS.heatmapColorScheme,
+        divergingColorScheme: DEFAULT_SETTINGS.divergingColorScheme,
+        metricAxis: 'auto',
+        includeAllIntegerColumns: DEFAULT_SETTINGS.includeAllIntegerColumns,
+      })
+      toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
+      const badge = getPopover()!.querySelector('#local-status-badge')!
+      expect(badge.textContent).toBe('Using Global Defaults')
+      expect(badge.classList.contains('b-a-t-badge-global')).toBe(true)
+    })
+
+    it('updates badge to Custom Override Active on change and back to Using Global Defaults when reverted', () => {
+      toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
+      const popover = getPopover()!
+      const badge = popover.querySelector('#local-status-badge')!
+      const barSel = getSelect('local-barColorScheme')
+
+      expect(badge.textContent).toBe('Using Global Defaults')
+
+      // Change setting away from global
+      barSel.value = 'Set1'
+      barSel.dispatchEvent(new Event('change'))
+      expect(badge.textContent).toBe('Custom Override Active')
+      expect(badge.classList.contains('b-a-t-badge-custom')).toBe(true)
+      expect(getLocalTableSettings('paper#t1')).toBeDefined()
+
+      // Change setting back to global
+      barSel.value = DEFAULT_SETTINGS.barColorScheme
+      barSel.dispatchEvent(new Event('change'))
+      expect(badge.textContent).toBe('Using Global Defaults')
+      expect(badge.classList.contains('b-a-t-badge-global')).toBe(true)
+      expect(getLocalTableSettings('paper#t1')).toBeUndefined()
     })
   })
 
@@ -447,6 +490,58 @@ describe('Settings Popover UI', () => {
       clickAction('reset-local')
       expect(axisSel.value).toBe('row')
       expect(badge.textContent).toBe('Using Global Defaults')
+    })
+
+    it('includes Include All-Integer Columns toggle without group title header', () => {
+      toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
+      const popover = getPopover()!
+      const localPanel = popover.querySelector('[data-panel="local"]')!
+      const intCheckbox = localPanel.querySelector(
+        'input[name="local-includeAllIntegerColumns"]',
+      ) as HTMLInputElement
+
+      expect(intCheckbox).not.toBeNull()
+      expect(intCheckbox.checked).toBe(false)
+      // Verify no group title header exists in local panel
+      const headers = localPanel.querySelectorAll('.b-a-t-settings-group-title')
+      expect(headers.length).toBe(0)
+    })
+
+    it('persists local includeAllIntegerColumns on Save for Table', () => {
+      toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
+      const popover = getPopover()!
+      const intCheckbox = popover.querySelector(
+        'input[name="local-includeAllIntegerColumns"]',
+      ) as HTMLInputElement
+
+      intCheckbox.checked = true
+      intCheckbox.dispatchEvent(new Event('change'))
+
+      clickAction('apply')
+
+      const local = getLocalTableSettings('paper#t1')
+      expect(local).toBeDefined()
+      expect(local!.settings.includeAllIntegerColumns).toBe(true)
+    })
+
+    it('reverts indicator when toggling includeAllIntegerColumns and toggling back', () => {
+      toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
+      const popover = getPopover()!
+      const badge = popover.querySelector('#local-status-badge')!
+      const intCheckbox = popover.querySelector(
+        'input[name="local-includeAllIntegerColumns"]',
+      ) as HTMLInputElement
+
+      expect(badge.textContent).toBe('Using Global Defaults')
+
+      intCheckbox.checked = true
+      intCheckbox.dispatchEvent(new Event('change'))
+      expect(badge.textContent).toBe('Custom Override Active')
+
+      intCheckbox.checked = false
+      intCheckbox.dispatchEvent(new Event('change'))
+      expect(badge.textContent).toBe('Using Global Defaults')
+      expect(getLocalTableSettings('paper#t1')).toBeUndefined()
     })
   })
 
