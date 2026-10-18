@@ -1,0 +1,160 @@
+{
+  "caption": "Table 3: Comparison among",
+  "metricAxis": "row",
+  "totalRowCount": 24,
+  "totalColCount": 6,
+  "topNonNumRows": 6,
+  "leftNonNumCols": 1,
+  "metrics": [
+    {
+      "rowName": [
+        "MMLU"
+      ],
+      "min": 85.02,
+      "max": 87.81,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "MMLU-Redux"
+      ],
+      "min": 82.69,
+      "max": 87.4,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "MMLU-Pro"
+      ],
+      "min": 58.07,
+      "max": 68.18,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "SuperGPQA"
+      ],
+      "min": 36.2,
+      "max": 44.06,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "BBH"
+      ],
+      "min": 83.62,
+      "max": 88.87,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "GPQA"
+      ],
+      "min": 41.92,
+      "max": 47.47,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "GSM8K"
+      ],
+      "min": 87.57,
+      "max": 94.39,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "MATH"
+      ],
+      "min": 62.12,
+      "max": 71.84,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "EvalPlus"
+      ],
+      "min": 61.43,
+      "max": 77.6,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "MultiPL-E"
+      ],
+      "min": 57.28,
+      "max": 65.94,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "MBPP"
+      ],
+      "min": 74.2,
+      "max": 81.4,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "CRUX-O"
+      ],
+      "min": 66.2,
+      "max": 79,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "MGSM"
+      ],
+      "min": 79.69,
+      "max": 83.53,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "MMMLU"
+      ],
+      "min": 83.09,
+      "max": 86.7,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "INCLUDE"
+      ],
+      "min": 66.97,
+      "max": 75.17,
+      "nullCount": 0,
+      "highlightedCount": 1,
+      "hasSd": false
+    }
+  ]
+}

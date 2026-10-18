@@ -13,7 +13,11 @@ import {
   injectButtons,
   ParsedTable,
 } from '../src/parser'
-import { _resetStorageForTesting, updateSettings } from '../src/settings'
+import {
+  _resetStorageForTesting,
+  setLocalTableSettings,
+  updateSettings,
+} from '../src/settings'
 
 describe('Chart & Visualization Styling', () => {
   beforeEach(() => {
@@ -609,6 +613,112 @@ describe('Chart & Visualization Styling', () => {
       // With includeAllIntegerColumns: true, integer column also receives background styling
       expect(tdInt0.style.background).toContain('linear-gradient')
       expect(tdFloat0.style.background).toContain('linear-gradient')
+    })
+  })
+
+  describe('metricAxis: "row" rendering', () => {
+    it('normalizes bars horizontally along rows rather than down columns', () => {
+      const dom = new JSDOM(`
+        <table>
+          <tbody>
+            <tr><td id="r0c0">10.5</td><td id="r0c1">20.5</td></tr>
+            <tr><td id="r1c0">1000.5</td><td id="r1c1">2000.5</td></tr>
+          </tbody>
+        </table>
+      `)
+      const table = dom.window.document.querySelector(
+        'table',
+      ) as HTMLTableElement
+      const td00 = table.rows[0].cells[0]
+      const td01 = table.rows[0].cells[1]
+      const td10 = table.rows[1].cells[0]
+      const td11 = table.rows[1].cells[1]
+
+      const parsed: ParsedTable = {
+        caption: 'Row Metric Table',
+        colNames: [['ModelA'], ['ModelB']],
+        rowNames: [['Metric1'], ['Metric2']],
+        topNonNumRows: 0,
+        leftNonNumCols: 0,
+        data: [
+          [
+            { value: 10.5, isHighlighted: false, raw: '10.5' },
+            { value: 20.5, isHighlighted: false, raw: '20.5' },
+          ],
+          [
+            { value: 1000.5, isHighlighted: false, raw: '1000.5' },
+            { value: 2000.5, isHighlighted: false, raw: '2000.5' },
+          ],
+        ],
+        domCells: [
+          [td00, td01],
+          [td10, td11],
+        ],
+        metricAxis: 'row',
+        orientation: 'row',
+      }
+
+      applyInlineBars(parsed, table, 'bars')
+
+      // In row 0: min=10.5 (0%), max=20.5 (100%)
+      expect(td00.style.background).toContain('0%')
+      expect(td01.style.background).toContain('100%')
+
+      // In row 1: min=1000.5 (0%), max=2000.5 (100%)
+      expect(td10.style.background).toContain('0%')
+      expect(td11.style.background).toContain('100%')
+    })
+
+    it('respects local settings override for metricAxis', () => {
+      const dom = new JSDOM(`
+        <table>
+          <tbody>
+            <tr><td id="r0c0">10.5</td><td id="r0c1">20.5</td></tr>
+            <tr><td id="r1c0">1000.5</td><td id="r1c1">2000.5</td></tr>
+          </tbody>
+        </table>
+      `)
+      const table = dom.window.document.querySelector(
+        'table',
+      ) as HTMLTableElement
+      const td00 = table.rows[0].cells[0]
+      const td01 = table.rows[0].cells[1]
+      const td10 = table.rows[1].cells[0]
+      const td11 = table.rows[1].cells[1]
+
+      const parsed: ParsedTable = {
+        caption: 'Default Column Table',
+        colNames: [['MetricA'], ['MetricB']],
+        rowNames: [['R1'], ['R2']],
+        topNonNumRows: 0,
+        leftNonNumCols: 0,
+        data: [
+          [
+            { value: 10.5, isHighlighted: false, raw: '10.5' },
+            { value: 20.5, isHighlighted: false, raw: '20.5' },
+          ],
+          [
+            { value: 1000.5, isHighlighted: false, raw: '1000.5' },
+            { value: 2000.5, isHighlighted: false, raw: '2000.5' },
+          ],
+        ],
+        domCells: [
+          [td00, td01],
+          [td10, td11],
+        ],
+        metricAxis: 'column',
+        orientation: 'column',
+      }
+
+      // Override table to 'row' via local table settings
+      const compositeKey = 'test#table-axis'
+      setLocalTableSettings(compositeKey, { metricAxis: 'row' })
+
+      applyInlineBars(parsed, table, 'bars', compositeKey)
+
+      // When overridden to 'row', row 0 evaluates [10.5, 20.5] so td01 is 100%
+      expect(td01.style.background).toContain('100%')
+      expect(td00.style.background).toContain('0%')
     })
   })
 })

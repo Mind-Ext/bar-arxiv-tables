@@ -1,0 +1,180 @@
+{
+  "caption": "Table 5: Performance comparison",
+  "metricAxis": "row",
+  "totalRowCount": 19,
+  "totalColCount": 8,
+  "topNonNumRows": 2,
+  "leftNonNumCols": 1,
+  "metrics": [
+    {
+      "rowName": [
+        "MMLU Pro"
+      ],
+      "min": 60,
+      "max": 85.2,
+      "nullCount": 1,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "AIME 2026 no tools"
+      ],
+      "min": 20.8,
+      "max": 89.2,
+      "nullCount": 1,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "LiveCodeBench v6"
+      ],
+      "min": 29.1,
+      "max": 80,
+      "nullCount": 1,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "Codeforces Elo"
+      ],
+      "min": 110,
+      "max": 2150,
+      "nullCount": 1,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "SciCode"
+      ],
+      "min": 21,
+      "max": 43,
+      "nullCount": 1,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "GPQA Diamond"
+      ],
+      "min": 42.4,
+      "max": 84.3,
+      "nullCount": 1,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "Big Bench Extra Hard micro avg"
+      ],
+      "min": 19.3,
+      "max": 74.4,
+      "nullCount": 1,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "HLE"
+      ],
+      "min": 5.2,
+      "max": 19.5,
+      "nullCount": 4,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "HLE with search"
+      ],
+      "min": 17.2,
+      "max": 26.5,
+      "nullCount": 5,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "IFBench"
+      ],
+      "min": 32,
+      "max": 76,
+      "nullCount": 1,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "IFEval"
+      ],
+      "min": 90.4,
+      "max": 98.9,
+      "nullCount": 1,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "MMMLU"
+      ],
+      "min": 67.4,
+      "max": 88.4,
+      "nullCount": 1,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "MRCR v2 8-needle, 128k"
+      ],
+      "min": 13.5,
+      "max": 66.4,
+      "nullCount": 1,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "Terminal Bench Hard"
+      ],
+      "min": 3,
+      "max": 36,
+      "nullCount": 1,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "Tau2 – airline"
+      ],
+      "min": 31,
+      "max": 76,
+      "nullCount": 1,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "Tau2 – retail"
+      ],
+      "min": 6.6,
+      "max": 86.4,
+      "nullCount": 1,
+      "highlightedCount": 0,
+      "hasSd": false
+    },
+    {
+      "rowName": [
+        "Tau2 – telecom"
+      ],
+      "min": 3.1,
+      "max": 69.3,
+      "nullCount": 1,
+      "highlightedCount": 0,
+      "hasSd": false
+    }
+  ]
+}

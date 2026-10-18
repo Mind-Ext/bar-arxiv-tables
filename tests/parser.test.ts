@@ -11,11 +11,16 @@ import { join } from 'path'
 import { JSDOM } from 'jsdom'
 import {
   CellValue,
+  computeMedian,
+  computeSliceCV,
+  detectMetricAxis,
   discoverTables,
   expandGrid,
   extractCellText,
   hasQualifyingNumericColumn,
   isAllIntegerColumn,
+  isAllIntegerRow,
+  MetricAxis,
   ParsedTable,
   parseNumeric,
   parseTable,
@@ -40,7 +45,8 @@ interface ExpectedMetric {
 
 interface ExpectedOutput {
   caption: string | null
-  orientation: 'column' | 'row'
+  metricAxis?: MetricAxis
+  orientation?: MetricAxis
   totalRowCount: number
   totalColCount: number
   topNonNumRows: number
@@ -54,23 +60,30 @@ function loadFixture(htmlPath: string): { dom: JSDOM; html: string } {
   return { dom, html }
 }
 
-function computeMetricStats(data: CellValue[][], colIndex: number) {
+function computeMetricStats(
+  data: CellValue[][],
+  index: number,
+  axis: MetricAxis = 'column',
+) {
   let min = Infinity
   let max = -Infinity
   let nullCount = 0
   let highlightedCount = 0
   let hasSd = false
 
-  for (let r = 0; r < data.length; r++) {
-    const cell = data[r][colIndex]
-    if (cell.value === null) {
+  const slice = axis === 'row' ? data[index] : data.map((r) => r[index])
+  if (!slice) return { min, max, nullCount, highlightedCount, hasSd }
+
+  for (let i = 0; i < slice.length; i++) {
+    const cell = slice[i]
+    if (!cell || cell.value === null) {
       nullCount++
     } else {
       if (cell.value < min) min = cell.value
       if (cell.value > max) max = cell.value
     }
-    if (cell.isHighlighted) highlightedCount++
-    if (cell.variance !== undefined) hasSd = true
+    if (cell?.isHighlighted) highlightedCount++
+    if (cell?.variance !== undefined) hasSd = true
   }
 
   return { min, max, nullCount, highlightedCount, hasSd }
@@ -144,8 +157,11 @@ describe('Fixture-based parser tests', () => {
           expect(parsed.leftNonNumCols).toBe(expected.leftNonNumCols)
         })
 
-        it('orientation matches', () => {
-          expect(parsed.orientation).toBe(expected.orientation)
+        const expAxis = expected.metricAxis || expected.orientation || 'column'
+        const names = expAxis === 'row' ? parsed.rowNames : parsed.colNames
+
+        it('metricAxis matches', () => {
+          expect(parsed.metricAxis).toBe(expAxis)
         })
 
         it('caption matches', () => {
@@ -157,50 +173,49 @@ describe('Fixture-based parser tests', () => {
         })
 
         it('metric count matches', () => {
-          expect(parsed.colNames).toHaveLength(expected.metrics.length)
+          expect(names).toHaveLength(expected.metrics.length)
         })
 
         for (let m = 0; m < expected.metrics.length; m++) {
           const metric = expected.metrics[m]
-          const nameKey = metric.colName ? 'colName' : 'rowName'
           const expectedName = metric.colName || metric.rowName || []
 
           describe(`metric[${m}] "${expectedName.join(' → ')}"`, () => {
             it('name matches', () => {
-              expect(parsed.colNames[m]).toEqual(expectedName)
+              expect(names[m]).toEqual(expectedName)
             })
 
             if (metric.min !== undefined) {
               it('min matches', () => {
-                const stats = computeMetricStats(parsed.data, m)
+                const stats = computeMetricStats(parsed.data, m, expAxis)
                 expect(stats.min).toBeCloseTo(metric.min!, 5)
               })
             }
 
             if (metric.max !== undefined) {
               it('max matches', () => {
-                const stats = computeMetricStats(parsed.data, m)
+                const stats = computeMetricStats(parsed.data, m, expAxis)
                 expect(stats.max).toBeCloseTo(metric.max!, 5)
               })
             }
 
             if (metric.nullCount !== undefined) {
               it('nullCount matches', () => {
-                const stats = computeMetricStats(parsed.data, m)
+                const stats = computeMetricStats(parsed.data, m, expAxis)
                 expect(stats.nullCount).toBe(metric.nullCount)
               })
             }
 
             if (metric.highlightedCount !== undefined) {
               it('highlightedCount matches', () => {
-                const stats = computeMetricStats(parsed.data, m)
+                const stats = computeMetricStats(parsed.data, m, expAxis)
                 expect(stats.highlightedCount).toBe(metric.highlightedCount)
               })
             }
 
             if (metric.hasSd !== undefined) {
               it('hasSd matches', () => {
-                const stats = computeMetricStats(parsed.data, m)
+                const stats = computeMetricStats(parsed.data, m, expAxis)
                 expect(stats.hasSd).toBe(metric.hasSd)
               })
             }
@@ -466,5 +481,138 @@ describe('discoverTables with scientific notation', () => {
       [{ value: 5e-2, isHighlighted: false, raw: '5e-2' }],
     ]
     expect(isAllIntegerColumn(floatSciData, 0)).toBe(false)
+  })
+})
+
+describe('computeSliceCV and computeMedian', () => {
+  it('computeSliceCV returns null for < 2 values', () => {
+    expect(computeSliceCV([])).toBeNull()
+    expect(computeSliceCV([42])).toBeNull()
+  })
+
+  it('computeSliceCV computes std / |mean| correctly', () => {
+    // [10, 10, 10] -> std = 0, cv = 0
+    expect(computeSliceCV([10, 10, 10])).toBeCloseTo(0, 5)
+
+    // [10, 20] -> mean = 15, var = ((10-15)^2 + (20-15)^2)/1 = 50, std = sqrt(50) = 7.071, cv = 7.071/15 = 0.4714
+    expect(computeSliceCV([10, 20])).toBeCloseTo(Math.sqrt(50) / 15, 4)
+  })
+
+  it('computeMedian calculates median for odd and even length arrays', () => {
+    expect(computeMedian([])).toBeNull()
+    expect(computeMedian([5])).toBe(5)
+    expect(computeMedian([3, 1, 2])).toBe(2)
+    expect(computeMedian([4, 1, 3, 2])).toBe(2.5)
+  })
+})
+
+describe('detectMetricAxis heuristics', () => {
+  it('detects column orientation when column bold ratio > 0.5 and > row bold ratio', () => {
+    // 3 rows x 2 cols. Col 0 has bold, Col 1 has bold (pCol = 2/2 = 1.0 > 0.5).
+    // Row 0 has bold, Row 1 has none, Row 2 has none (pRow = 1/3 = 0.33).
+    const data: CellValue[][] = [
+      [
+        { value: 80, isHighlighted: true, raw: '80' },
+        { value: 90, isHighlighted: true, raw: '90' },
+      ],
+      [
+        { value: 75, isHighlighted: false, raw: '75' },
+        { value: 85, isHighlighted: false, raw: '85' },
+      ],
+      [
+        { value: 70, isHighlighted: false, raw: '70' },
+        { value: 80, isHighlighted: false, raw: '80' },
+      ],
+    ]
+    expect(detectMetricAxis(data)).toBe('column')
+  })
+
+  it('detects row orientation when row bold ratio > 0.5 and > column bold ratio', () => {
+    // 2 rows x 3 cols.
+    // Row 0 has bold, Row 1 has bold (pRow = 2/2 = 1.0 > 0.5).
+    // Col 0 has bold in row 0 & 1, Col 1 has none, Col 2 has none (pCol = 1/3 = 0.33).
+    const data: CellValue[][] = [
+      [
+        { value: 80, isHighlighted: true, raw: '80' },
+        { value: 75, isHighlighted: false, raw: '75' },
+        { value: 70, isHighlighted: false, raw: '70' },
+      ],
+      [
+        { value: 90, isHighlighted: true, raw: '90' },
+        { value: 85, isHighlighted: false, raw: '85' },
+        { value: 80, isHighlighted: false, raw: '80' },
+      ],
+    ]
+    expect(detectMetricAxis(data)).toBe('row')
+  })
+
+  it('falls through to CV when bold ratio <= 0.5', () => {
+    // 4 rows x 4 cols, only 1 bold in entire table (pCol = 0.25 <= 0.5, pRow = 0.25 <= 0.5)
+    // Row numbers:
+    // Row 0: [100, 102, 101, 103] (tight, small CV)
+    // Row 1: [2000, 2010, 2005, 2020] (tight, small CV)
+    // Row 2: [5, 5.2, 5.1, 5.3] (tight, small CV)
+    // Row 3: [50, 52, 51, 53] (tight, small CV)
+    // Along columns: each column mixes 100, 2000, 5, 50 -> huge CV!
+    const data: CellValue[][] = [
+      [
+        { value: 100, isHighlighted: true, raw: '100' },
+        { value: 102, isHighlighted: false, raw: '102' },
+        { value: 101, isHighlighted: false, raw: '101' },
+        { value: 103, isHighlighted: false, raw: '103' },
+      ],
+      [
+        { value: 2000, isHighlighted: false, raw: '2000' },
+        { value: 2010, isHighlighted: false, raw: '2010' },
+        { value: 2005, isHighlighted: false, raw: '2005' },
+        { value: 2020, isHighlighted: false, raw: '2020' },
+      ],
+      [
+        { value: 5, isHighlighted: false, raw: '5' },
+        { value: 5.2, isHighlighted: false, raw: '5.2' },
+        { value: 5.1, isHighlighted: false, raw: '5.1' },
+        { value: 5.3, isHighlighted: false, raw: '5.3' },
+      ],
+      [
+        { value: 50, isHighlighted: false, raw: '50' },
+        { value: 52, isHighlighted: false, raw: '52' },
+        { value: 51, isHighlighted: false, raw: '51' },
+        { value: 53, isHighlighted: false, raw: '53' },
+      ],
+    ]
+    expect(detectMetricAxis(data)).toBe('row')
+  })
+
+  it('defaults to column on empty or inconclusive data', () => {
+    expect(detectMetricAxis([])).toBe('column')
+    expect(detectMetricAxis([[]])).toBe('column')
+  })
+})
+
+describe('isAllIntegerRow helper', () => {
+  it('returns true when all numeric cells in a row are integers', () => {
+    const data: CellValue[][] = [
+      [
+        { value: 10, isHighlighted: false, raw: '10' },
+        { value: 20, isHighlighted: false, raw: '20' },
+        { value: null, isHighlighted: false, raw: '-' },
+      ],
+    ]
+    expect(isAllIntegerRow(data, 0)).toBe(true)
+  })
+
+  it('returns false when at least one numeric cell is a float', () => {
+    const data: CellValue[][] = [
+      [
+        { value: 10, isHighlighted: false, raw: '10' },
+        { value: 20.5, isHighlighted: false, raw: '20.5' },
+      ],
+    ]
+    expect(isAllIntegerRow(data, 0)).toBe(false)
+  })
+
+  it('returns false for invalid row index or empty row', () => {
+    expect(isAllIntegerRow([], 0)).toBe(false)
+    expect(isAllIntegerRow([[]], 0)).toBe(false)
   })
 })

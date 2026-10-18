@@ -9,8 +9,11 @@
 // Types
 // ---------------------------------------------------------------------------
 
-/** Orientation of the data in the original table. */
-export type Orientation = 'column' | 'row'
+/** Metric axis of the data in the table: 'column' (metrics in columns) or 'row' (metrics in rows). */
+export type MetricAxis = 'column' | 'row'
+
+/** @deprecated Use MetricAxis instead. */
+export type Orientation = MetricAxis
 
 /** A single parsed numeric cell. */
 export interface CellValue {
@@ -50,8 +53,11 @@ export interface ParsedTable {
   /** Parallel grid of DOM references, shape [rows × cols]. */
   domCells: HTMLTableCellElement[][]
 
-  /** Detected orientation of the original table. */
-  orientation: Orientation
+  /** Detected metric axis of the table ('column' | 'row'). */
+  metricAxis: MetricAxis
+
+  /** Detected orientation of the original table (alias for metricAxis). */
+  orientation: MetricAxis
 }
 
 // ---------------------------------------------------------------------------
@@ -470,6 +476,139 @@ export function extractBody(
 }
 
 // ---------------------------------------------------------------------------
+// 4d. Metric Axis (Orientation) Detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute the Coefficient of Variation (CV = std / |mean|) for an array of numbers.
+ * Returns null if fewer than 2 numbers.
+ */
+export function computeSliceCV(vals: number[]): number | null {
+  const n = vals.length
+  if (n < 2) return null
+  const mean = vals.reduce((a, b) => a + b, 0) / n
+  const variance = vals.reduce((sum, v) => sum + (v - mean) ** 2, 0) / (n - 1)
+  const std = Math.sqrt(variance)
+
+  // Use mean absolute value as scale denominator to avoid division by near-zero on bipolar metrics
+  const meanAbs = vals.reduce((sum, v) => sum + Math.abs(v), 0) / n
+  const denominator = Math.max(meanAbs, 1e-9)
+  return std / denominator
+}
+
+/**
+ * Compute the median of an array of numbers.
+ * Returns null if array is empty.
+ */
+export function computeMedian(arr: number[]): number | null {
+  if (arr.length === 0) return null
+  const sorted = [...arr].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 !== 0
+    ? sorted[mid]
+    : (sorted[mid - 1] + sorted[mid]) / 2
+}
+
+/**
+ * Detect whether the table's metric axis is column-oriented ('column') or row-oriented ('row').
+ *
+ * Heuristics:
+ * 1. Bold ratio: compute percentage of columns and rows containing at least one bold/highlighted cell.
+ *    If the larger ratio > 0.5 (50%) and ratios are not equal, the direction with higher bold ratio is chosen.
+ * 2. If no bold decision (neither > 50%, tie, or no bold):
+ *    Compute the median coefficient of variation (CV = std / |mean|) across columns and rows
+ *    (for slices with >= 2 numeric cells).
+ *    The direction with the smaller median CV is chosen (measurements of the same metric cluster closer).
+ * 3. Default fallback: 'column'.
+ */
+export function detectMetricAxis(data: CellValue[][]): MetricAxis {
+  const numRows = data.length
+  if (numRows === 0) return 'column'
+  const numCols = data[0].length
+  if (numCols === 0) return 'column'
+
+  // 1. Bold ratio
+  let colsWithBold = 0
+  for (let c = 0; c < numCols; c++) {
+    for (let r = 0; r < numRows; r++) {
+      if (data[r][c]?.isHighlighted) {
+        colsWithBold++
+        break
+      }
+    }
+  }
+
+  let rowsWithBold = 0
+  for (let r = 0; r < numRows; r++) {
+    for (let c = 0; c < numCols; c++) {
+      if (data[r][c]?.isHighlighted) {
+        rowsWithBold++
+        break
+      }
+    }
+  }
+
+  const pCol = colsWithBold / numCols
+  const pRow = rowsWithBold / numRows
+
+  const maxP = Math.max(pCol, pRow)
+  if (maxP > 0.5 && pCol !== pRow) {
+    return pCol > pRow ? 'column' : 'row'
+  }
+
+  // 2. Median Coefficient of Variation (CV)
+  const colCVs: number[] = []
+  for (let c = 0; c < numCols; c++) {
+    const vals: number[] = []
+    for (let r = 0; r < numRows; r++) {
+      const v = data[r][c]?.value
+      if (v !== null && v !== undefined && isFinite(v)) {
+        vals.push(v)
+      }
+    }
+    if (vals.length >= 3) {
+      const cv = computeSliceCV(vals)
+      if (cv !== null) colCVs.push(cv)
+    }
+  }
+
+  const rowCVs: number[] = []
+  for (let r = 0; r < numRows; r++) {
+    const vals: number[] = []
+    for (let c = 0; c < numCols; c++) {
+      const v = data[r][c]?.value
+      if (v !== null && v !== undefined && isFinite(v)) {
+        vals.push(v)
+      }
+    }
+    if (vals.length >= 3) {
+      const cv = computeSliceCV(vals)
+      if (cv !== null) rowCVs.push(cv)
+    }
+  }
+
+  const medianColCV = computeMedian(colCVs)
+  const medianRowCV = computeMedian(rowCVs)
+
+  if (
+    medianColCV !== null &&
+    medianRowCV !== null &&
+    medianColCV !== medianRowCV
+  ) {
+    return medianColCV < medianRowCV ? 'column' : 'row'
+  }
+  if (medianColCV !== null && medianRowCV === null) {
+    return 'column'
+  }
+  if (medianRowCV !== null && medianColCV === null) {
+    return 'row'
+  }
+
+  // 3. Fallback
+  return 'column'
+}
+
+// ---------------------------------------------------------------------------
 // Main parse function
 // ---------------------------------------------------------------------------
 
@@ -532,8 +671,8 @@ export function parseTable(
     rowNames.push(levels)
   }
 
-  // Default orientation: column-oriented
-  const orientation: Orientation = 'column'
+  // Detect metric axis via heuristics (bold ratio -> median CV -> default column)
+  const metricAxis = detectMetricAxis(data)
 
   return {
     caption,
@@ -543,7 +682,8 @@ export function parseTable(
     leftNonNumCols,
     data,
     domCells,
-    orientation,
+    metricAxis,
+    orientation: metricAxis,
   }
 }
 
@@ -823,6 +963,29 @@ export function isAllIntegerColumn(
 }
 
 /**
+ * Check if all non-null finite numeric values in a row are integers.
+ * Returns true if the row contains at least one numeric value and all numeric values are integers.
+ */
+export function isAllIntegerRow(
+  data: CellValue[][],
+  rowIndex: number,
+): boolean {
+  let hasNumeric = false
+  const row = data[rowIndex]
+  if (!row) return false
+  for (let c = 0; c < row.length; c++) {
+    const cell = row[c]
+    if (cell && cell.value !== null && isFinite(cell.value)) {
+      hasNumeric = true
+      if (!Number.isInteger(cell.value)) {
+        return false
+      }
+    }
+  }
+  return hasNumeric
+}
+
+/**
  * Check if a parsed table has at least one qualifying numerical column.
  * A column qualifies if it has ≥ 3 numeric values and the numbers are not
  * all integers (unless includeAllIntegerColumns is true).
@@ -848,6 +1011,27 @@ export function hasQualifyingNumericColumn(
       return true
     }
   }
+
+  // If table is row-oriented, check if any row qualifies (>= 3 values)
+  if (parsed.metricAxis === 'row') {
+    for (let r = 0; r < parsed.data.length; r++) {
+      let numericCount = 0
+      let allIntegers = true
+      for (let c = 0; c < numCols; c++) {
+        const cell = parsed.data[r][c]
+        if (cell.value !== null && isFinite(cell.value)) {
+          numericCount++
+          if (!Number.isInteger(cell.value)) {
+            allIntegers = false
+          }
+        }
+      }
+      if (numericCount >= 3 && (includeAllIntegerColumns || !allIntegers)) {
+        return true
+      }
+    }
+  }
+
   return false
 }
 

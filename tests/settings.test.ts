@@ -50,6 +50,7 @@ describe('Settings Management', () => {
       barColorScheme: 'Pastel1',
       heatmapColorScheme: 'Cividis',
       divergingColorScheme: 'PuOr',
+      metricAxis: 'auto',
       includeAllIntegerColumns: false,
       urlWhitelist: DEFAULT_WHITELIST,
     })

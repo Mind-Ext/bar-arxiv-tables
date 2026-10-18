@@ -1,4 +1,10 @@
-import { CellValue, isAllIntegerColumn, ParsedTable } from './parser'
+import {
+  CellValue,
+  isAllIntegerColumn,
+  isAllIntegerRow,
+  MetricAxis,
+  ParsedTable,
+} from './parser'
 import {
   getEffectiveSettings,
   isColormap,
@@ -96,6 +102,29 @@ function computeColumnStats(
 }
 
 /**
+ * Compute per-row min/max statistics.
+ */
+function computeRowStats(
+  data: CellValue[][],
+): ColumnStats[] {
+  const stats: ColumnStats[] = []
+  for (let r = 0; r < data.length; r++) {
+    let min = Infinity
+    let max = -Infinity
+    const row = data[r]
+    for (let c = 0; c < row.length; c++) {
+      const v = row[c]?.value
+      if (v !== null && v !== undefined && isFinite(v)) {
+        if (v < min) min = v
+        if (v > max) max = v
+      }
+    }
+    stats.push({ min, max })
+  }
+  return stats
+}
+
+/**
  * Build the CSS linear-gradient for a cell based on column polarity and palette color.
  */
 function buildGradient(
@@ -153,10 +182,16 @@ export function applyInlineBars(
   const { data, domCells } = parsed
   if (data.length === 0) return
 
-  const numCols = data[0].length
-  const stats = computeColumnStats(data, numCols)
-
   const settings = getEffectiveSettings(compositeKey)
+  const isRowMetric = (settings.metricAxis && settings.metricAxis !== 'auto')
+    ? settings.metricAxis === 'row'
+    : parsed.metricAxis === 'row'
+
+  const numCols = data[0].length
+  const stats = isRowMetric
+    ? computeRowStats(data)
+    : computeColumnStats(data, numCols)
+
   const chartOpacity = settings.chartOpacity !== undefined
     ? settings.chartOpacity
     : 0.35
@@ -173,19 +208,22 @@ export function applyInlineBars(
     settings.divergingColorScheme || 'PuOr',
   )
 
-  const colIsAllInteger: boolean[] = []
-  for (let c = 0; c < numCols; c++) {
-    colIsAllInteger.push(isAllIntegerColumn(data, c))
+  const numSlices = isRowMetric ? data.length : numCols
+  const sliceIsAllInteger: boolean[] = []
+  for (let i = 0; i < numSlices; i++) {
+    sliceIsAllInteger.push(
+      isRowMetric ? isAllIntegerRow(data, i) : isAllIntegerColumn(data, i),
+    )
   }
 
-  // Precompute per-column colors cycled from the active palette cycle for bars mode
-  const columnBarColors: BarColors[] = []
-  for (let c = 0; c < numCols; c++) {
-    const palette = paletteCycle[c % paletteCycle.length]
-    const baseColor = palette[c % palette.length]
+  // Precompute per-slice colors cycled from the active palette cycle for bars mode
+  const sliceBarColors: BarColors[] = []
+  for (let i = 0; i < numSlices; i++) {
+    const palette = paletteCycle[i % paletteCycle.length]
+    const baseColor = palette[i % palette.length]
     const { r, g, b } = parseToRgb(baseColor)
     const colorStr = `rgba(${r}, ${g}, ${b}, ${chartOpacity})`
-    columnBarColors.push({
+    sliceBarColors.push({
       pos: colorStr,
       posAccent: colorStr,
       neg: colorStr,
@@ -203,31 +241,34 @@ export function applyInlineBars(
 
       if (!cell || cv.value === null) continue
 
-      // Stats might be degenerate (no finite values found)
-      if (!isFinite(stats[c].min) || !isFinite(stats[c].max)) continue
+      const sliceIndex = isRowMetric ? r : c
+      const sliceStat = stats[sliceIndex]
 
-      // Skip all-integer columns if includeAllIntegerColumns is false
-      if (!includeAllIntegerColumns && colIsAllInteger[c]) continue
+      // Stats might be degenerate (no finite values found)
+      if (!isFinite(sliceStat.min) || !isFinite(sliceStat.max)) continue
+
+      // Skip all-integer slices if includeAllIntegerColumns is false
+      if (!includeAllIntegerColumns && sliceIsAllInteger[sliceIndex]) continue
 
       // Save original
       originalStyles.set(cell, cell.style.background || '')
 
       if (activeMode === 'heatmap') {
-        const { min, max } = stats[c]
+        const { min, max } = sliceStat
         let norm: number
         let interpolator: (t: number) => string
 
         if (min < 0 && max > 0) {
-          // Bipolar column (mixed positive and negative values):
+          // Bipolar column/row (mixed positive and negative values):
           // Map zero to 0.5 with symmetric scaling [-absMax, absMax]
           const absMax = Math.max(Math.abs(min), Math.abs(max))
           norm = absMax === 0 ? 0.5 : 0.5 + (cv.value / absMax) * 0.5
           interpolator =
-            divergingColormapCycle[c % divergingColormapCycle.length]
+            divergingColormapCycle[sliceIndex % divergingColormapCycle.length]
         } else {
-          // Unipolar column (all non-negative or all non-positive):
+          // Unipolar column/row (all non-negative or all non-positive):
           norm = min === max ? 0.5 : (cv.value - min) / (max - min)
-          interpolator = colormapCycle[c % colormapCycle.length]
+          interpolator = colormapCycle[sliceIndex % colormapCycle.length]
         }
 
         norm = Math.max(0, Math.min(1, norm))
@@ -238,13 +279,14 @@ export function applyInlineBars(
           `linear-gradient(to right, ${heatColor} 100%, transparent 100%)`
       } else {
         // Bar mode
-        let barColors = columnBarColors[c]
+        let barColors = sliceBarColors[sliceIndex]
         if (isBarColormap && barColormapCycle) {
-          const { min, max } = stats[c]
+          const { min, max } = sliceStat
           const norm = min === max
             ? 0.5
             : Math.max(0, Math.min(1, (cv.value - min) / (max - min)))
-          const interpolator = barColormapCycle[c % barColormapCycle.length]
+          const interpolator =
+            barColormapCycle[sliceIndex % barColormapCycle.length]
           const rgbStr = interpolator(norm)
           const { r, g, b } = parseToRgb(rgbStr)
           const colorStr = `rgba(${r}, ${g}, ${b}, ${chartOpacity})`
@@ -257,7 +299,7 @@ export function applyInlineBars(
         }
         cell.style.background = buildGradient(
           cv.value,
-          stats[c],
+          sliceStat,
           cv.isHighlighted,
           barColors,
         )

@@ -392,6 +392,62 @@ describe('Settings Popover UI', () => {
       // Popover should remain open (reset doesn't close)
       expect(getPopover()).not.toBeNull()
     })
+
+    it('Save for Table — persists local metricAxis selection', () => {
+      toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
+
+      const axisSel = getSelect('local-metricAxis')
+      expect(axisSel).not.toBeNull()
+      expect(axisSel.value).toBe('column')
+      expect(axisSel.options[0].textContent).toContain('(Auto-detected)')
+      expect(axisSel.options[1].textContent).not.toContain('(Auto-detected)')
+
+      axisSel.value = 'row'
+      axisSel.dispatchEvent(new Event('change'))
+
+      expect(onUpdate).toHaveBeenCalled()
+
+      clickAction('apply')
+
+      const local = getLocalTableSettings('paper#t1')
+      expect(local).toBeDefined()
+      expect(local!.settings.metricAxis).toBe('row')
+    })
+
+    it('populates existing local metricAxis and resets it on reset-local', () => {
+      setLocalTableSettings('paper#t1', { metricAxis: 'row' })
+      toggleSettingsPopover(anchor, 'paper#t1', onUpdate)
+
+      const axisSel = getSelect('local-metricAxis')
+      expect(axisSel.value).toBe('row')
+
+      clickAction('reset-local')
+
+      expect(axisSel.value).toBe('column')
+      expect(getLocalTableSettings('paper#t1')).toBeUndefined()
+    })
+
+    it('honors detectedMetricAxis="row" by defaulting to row and annotating option', () => {
+      toggleSettingsPopover(anchor, 'paper#t1', onUpdate, undefined, 'row')
+
+      const axisSel = getSelect('local-metricAxis')
+      expect(axisSel.value).toBe('row')
+      expect(axisSel.options[0].textContent).not.toContain('(Auto-detected)')
+      expect(axisSel.options[1].textContent).toContain('(Auto-detected)')
+
+      // Badge should show Using Global Defaults because it matches the heuristic
+      const badge = getPopover()!.querySelector('#local-status-badge')!
+      expect(badge.textContent).toBe('Using Global Defaults')
+
+      // Changing to column should activate custom override
+      axisSel.value = 'column'
+      axisSel.dispatchEvent(new Event('change'))
+      expect(badge.textContent).toBe('Custom Override Active')
+
+      clickAction('reset-local')
+      expect(axisSel.value).toBe('row')
+      expect(badge.textContent).toBe('Using Global Defaults')
+    })
   })
 
   // -----------------------------------------------------------------------

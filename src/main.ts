@@ -175,9 +175,15 @@ function handleSettings(
   btn: HTMLButtonElement,
 ): void {
   const compositeKey = getTableCompositeKey(candidate.id)
-  toggleSettingsPopover(btn, compositeKey, () => {
-    updateAllVisualizations()
-  })
+  toggleSettingsPopover(
+    btn,
+    compositeKey,
+    () => {
+      updateAllVisualizations()
+    },
+    undefined,
+    candidate.parsed.metricAxis,
+  )
 }
 
 function processPage(): void {
@@ -222,7 +228,11 @@ function activatePage(): void {
     console.log(
       `[bar-arxiv-tables] Detected ${newCandidates.length} new table(s).`,
     )
-    injectButtons(newCandidates, handleVisualize, handleSettings)
+    injectButtons(
+      newCandidates,
+      handleVisualize,
+      handleSettings,
+    )
 
     const autoVis = getSettings().autoVisualize
     if (autoVis !== 'off') {

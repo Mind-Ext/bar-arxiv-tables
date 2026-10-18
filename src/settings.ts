@@ -42,6 +42,7 @@ import {
 } from 'd3-scale-chromatic'
 
 export type AutoVisualizeMode = 'off' | 'heatmap' | 'bars'
+export type MetricAxisMode = 'auto' | 'column' | 'row'
 
 export interface Settings {
   // Render Settings
@@ -51,6 +52,7 @@ export interface Settings {
   barColorScheme: string
   heatmapColorScheme: string
   divergingColorScheme: string
+  metricAxis: MetricAxisMode
 
   // Parser Settings
   includeAllIntegerColumns: boolean
@@ -72,6 +74,7 @@ export const DEFAULT_SETTINGS: Settings = {
   barColorScheme: 'Pastel1',
   heatmapColorScheme: 'Cividis',
   divergingColorScheme: 'PuOr',
+  metricAxis: 'auto',
   includeAllIntegerColumns: false,
   urlWhitelist: DEFAULT_WHITELIST,
 }
@@ -83,6 +86,7 @@ export interface LocalTableSetting {
     barColorScheme: string
     heatmapColorScheme: string
     divergingColorScheme: string
+    metricAxis: MetricAxisMode
   }>
 }
 
@@ -255,6 +259,10 @@ export function getSettings(): Settings {
       'divergingColorScheme',
       DEFAULT_SETTINGS.divergingColorScheme,
     ),
+    metricAxis: getValue<MetricAxisMode>(
+      'metricAxis',
+      DEFAULT_SETTINGS.metricAxis,
+    ),
     includeAllIntegerColumns: getValue<boolean>(
       'includeAllIntegerColumns',
       DEFAULT_SETTINGS.includeAllIntegerColumns,
@@ -290,6 +298,9 @@ export function updateSettings(partial: Partial<Settings>): Settings {
   }
   if (partial.divergingColorScheme !== undefined) {
     setValue('divergingColorScheme', updated.divergingColorScheme)
+  }
+  if (partial.metricAxis !== undefined) {
+    setValue('metricAxis', updated.metricAxis)
   }
   if (partial.includeAllIntegerColumns !== undefined) {
     setValue('includeAllIntegerColumns', updated.includeAllIntegerColumns)
@@ -531,11 +542,7 @@ export function getLocalTableSettings(
  */
 export function setLocalTableSettings(
   compositeKey: string,
-  settings: Partial<{
-    barColorScheme: string
-    heatmapColorScheme: string
-    divergingColorScheme: string
-  }>,
+  settings: LocalTableSetting['settings'],
 ): void {
   const map = getValue<LocalSettingsMap>('localTableSettings', {})
   map[compositeKey] = { lastUsed: Date.now(), settings }
@@ -590,6 +597,9 @@ export function getEffectiveSettings(compositeKey?: string): Settings {
   }
   if (entry.settings.divergingColorScheme !== undefined) {
     merged.divergingColorScheme = entry.settings.divergingColorScheme
+  }
+  if (entry.settings.metricAxis !== undefined) {
+    merged.metricAxis = entry.settings.metricAxis
   }
   return merged
 }

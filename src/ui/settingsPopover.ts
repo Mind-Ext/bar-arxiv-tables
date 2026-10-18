@@ -15,6 +15,7 @@ import {
   getSettings,
   isUrlAllowed,
   matchesRule,
+  MetricAxisMode,
   PRESET_COLORMAPS,
   PRESET_DIVERGING_COLORMAPS,
   PRESET_PALETTES,
@@ -47,6 +48,7 @@ export interface TabRenderContext {
     heatSeq: string
     heatDiv: string
   }
+  detectedMetricAxis?: MetricAxisMode
 }
 
 export interface SettingsTab {
@@ -444,6 +446,18 @@ const localTab: SettingsTab = {
   }" data-panel="local">
       <div id="local-status-badge" class="b-a-t-settings-badge b-a-t-badge-global">Using Global Defaults</div>
 
+      <div class="b-a-t-settings-field">
+        <label>Metric Axis</label>
+        <select name="local-metricAxis">
+          <option value="column">Columns (↕)${
+    ctx.detectedMetricAxis !== 'row' ? ' (Auto-detected)' : ''
+  }</option>
+          <option value="row">Rows (↔)${
+    ctx.detectedMetricAxis === 'row' ? ' (Auto-detected)' : ''
+  }</option>
+        </select>
+      </div>
+
       ${renderColorSchemeGroup('local', ctx.options)}
 
       <div class="b-a-t-settings-footer">
@@ -630,6 +644,7 @@ export function toggleSettingsPopover(
   compositeKey: string,
   onUpdate: () => void,
   initialTab?: 'local' | 'global' | 'whitelist',
+  detectedMetricAxis?: MetricAxisMode,
 ): void {
   // If clicking same anchor, close and return
   if (currentPopover && currentAnchor === anchorEl) {
@@ -641,6 +656,10 @@ export function toggleSettingsPopover(
   cleanupOnClose = null
   closePopover()
   cssOnce()
+
+  const effectiveDetectedAxis: MetricAxisMode = detectedMetricAxis === 'row'
+    ? 'row'
+    : 'column'
 
   // Snapshot initial persistent states for live preview rollback
   const initialGlobalSettings = { ...getSettings() }
@@ -666,6 +685,7 @@ export function toggleSettingsPopover(
 
   const context: TabRenderContext = {
     compositeKey,
+    detectedMetricAxis: effectiveDetectedAxis,
     options: {
       bar: getOptionsHTML('palette'),
       heatSeq: getOptionsHTML('sequential'),
@@ -805,6 +825,11 @@ export function toggleSettingsPopover(
     if (!localBadge || !compositeKey) return
     const globalSettings = getSettings()
     const currentLocal = getGroupSchemeValues(popover, 'local')
+    const axisSelect = popover.querySelector<HTMLSelectElement>(
+      'select[name="local-metricAxis"]',
+    )
+    const currentAxis = (axisSelect?.value as MetricAxisMode) ||
+      effectiveDetectedAxis
 
     const isCustom = Boolean(
       getLocalTableSettings(compositeKey) ||
@@ -812,7 +837,8 @@ export function toggleSettingsPopover(
         currentLocal.heatmapColorScheme !==
           globalSettings.heatmapColorScheme ||
         currentLocal.divergingColorScheme !==
-          globalSettings.divergingColorScheme,
+          globalSettings.divergingColorScheme ||
+        currentAxis !== effectiveDetectedAxis,
     )
 
     if (isCustom) {
@@ -850,7 +876,15 @@ export function toggleSettingsPopover(
   const triggerLivePreviewLocal = (): void => {
     if (!compositeKey) return
     const values = getGroupSchemeValues(popover, 'local')
-    setLocalTableSettings(compositeKey, values)
+    const axisSelect = popover.querySelector<HTMLSelectElement>(
+      'select[name="local-metricAxis"]',
+    )
+    const metricAxis = (axisSelect?.value as MetricAxisMode) ||
+      effectiveDetectedAxis
+    setLocalTableSettings(compositeKey, {
+      ...values,
+      metricAxis,
+    })
     updateLocalBadge()
     onUpdate()
   }
@@ -894,6 +928,16 @@ export function toggleSettingsPopover(
     if (compositeKey) {
       const effective = getEffectiveSettings(compositeKey)
       setGroupSchemeValues(popover, effective, 'local')
+      const localEntry = getLocalTableSettings(compositeKey)
+      const axisSelect = popover.querySelector<HTMLSelectElement>(
+        'select[name="local-metricAxis"]',
+      )
+      if (axisSelect) {
+        const savedAxis = localEntry?.settings.metricAxis
+        axisSelect.value = savedAxis && savedAxis !== 'auto'
+          ? savedAxis
+          : effectiveDetectedAxis
+      }
       updateLocalBadge()
     }
 
@@ -1002,7 +1046,15 @@ export function toggleSettingsPopover(
       case 'apply': {
         if (compositeKey) {
           const values = getGroupSchemeValues(popover, 'local')
-          setLocalTableSettings(compositeKey, values)
+          const axisSelect = popover.querySelector<HTMLSelectElement>(
+            'select[name="local-metricAxis"]',
+          )
+          const metricAxis = (axisSelect?.value as MetricAxisMode) ||
+            effectiveDetectedAxis
+          setLocalTableSettings(compositeKey, {
+            ...values,
+            metricAxis,
+          })
         }
         isSaved = true
         onUpdate()
